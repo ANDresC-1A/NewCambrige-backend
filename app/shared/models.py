@@ -19,4 +19,3 @@ class PeriodoAcademico(Base):
     nombre = Column(String(50), nullable=False)
     anio = Column(Integer, nullable=False)
     activo = Column(Boolean, default=True)
-

@@ -12,6 +12,6 @@ def listar_periodos(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
     db: Session = Depends(get_db),
-    current_user =  Depends(require_roles(["admin", "titular", "secretaria"]))
+    current_user =  Depends(require_roles(["admin", "titular", "secretaria",  "tesoreria"]))
 ):
     return service.get_all(db, skip, limit)

@@ -1,21 +1,20 @@
+from typing import Optional, List, Union
 from pydantic import BaseModel, Field, field_validator
 import re
 
 class AnioEscolarCreate(BaseModel):
-    nombre: str = Field(..., example="2025-2026")
-    activo: bool = Field(False, description="¿Debe ser el año activo?")
+    # El usuario solo envía el número inicial (ej: 2025)
+    anio_inicio: int = Field(..., gt=2000, lt=2100, example=2025)
+    activo: bool = Field(False)
 
-    @field_validator('nombre')
-    @classmethod
-    def validar_formato(cls, v):
-        # Valida que sea 4 dígitos, un guion y otros 4 dígitos
-        if not re.match(r"^\d{4}-\d{4}$", v):
-            raise ValueError("El formato debe ser YYYY-YYYY (ej. 2025-2026)")
-        return v
+class AnioEscolarUpdate(BaseModel):
+    activo: bool = Field(..., description="Nuevo estado de activación del año")
 
-class AnioEscolarRead(AnioEscolarCreate):
+class AnioEscolarRead(BaseModel):
     id_periodo: int
+    nombre: str # Seguiremos mostrando "2025-2026" al usuario
     anio: int
+    activo: bool
 
     class Config:
         from_attributes = True

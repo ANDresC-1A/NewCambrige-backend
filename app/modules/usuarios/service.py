@@ -31,6 +31,7 @@ def get_usuario_con_roles(db: Session, usuario_id: int) -> Optional[dict]:
     return {
         "id_usuario": usuario.id_usuario,
         "nombre": usuario.nombre,
+        "estado": usuario.estado,
         "created_at": usuario.created_at,
         "roles": [r[0] for r in roles]
     }
@@ -38,7 +39,8 @@ def get_usuario_con_roles(db: Session, usuario_id: int) -> Optional[dict]:
 def create_usuario(db: Session, data: dict) -> Usuario:
     nuevo = Usuario(
         nombre=data["nombre"],
-        contrasena=hash_password(data["password"])
+        contrasena=hash_password(data["password"]),
+        estado=data.get("estado", True)
     )
     db.add(nuevo)
     db.commit()
@@ -63,7 +65,9 @@ def update_usuario(db: Session, usuario_id: int, data: dict) -> Optional[Usuario
         usuario.nombre = data["nombre"]
     if "password" in data and data["password"]:
         usuario.contrasena = hash_password(data["password"])
-    
+        
+    if "estado" in data and data["estado"] is not None:
+        usuario.estado = data["estado"]
     db.commit()
     db.refresh(usuario)
     return usuario

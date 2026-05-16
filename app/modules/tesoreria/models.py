@@ -25,9 +25,11 @@ class DetalleMatricula(Base):
     id_detalle = Column(Integer, primary_key=True, index=True)
     id_matricula = Column(Integer, ForeignKey("matricula.id_matricula"))
     id_tipo = Column(Integer, ForeignKey("tipo_concepto.id_tipo"))
-    descripcion = Column(String(100))
+    #descripcion = Column(String(100))
+    mes = Column(String(12))
     estado = Column(String(20), index=True)
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
     updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now())
     matricula = relationship("Matricula", back_populates="detalles")
     tipo = relationship("TipoConcepto")
+

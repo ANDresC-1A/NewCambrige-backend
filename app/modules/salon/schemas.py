@@ -21,3 +21,23 @@ class SalonResponse(SalonBase):
     
     class Config:
         from_attributes = True
+        
+# ======================
+# 🧪 PRUEBAS
+# ======================
+class PruebaResponse(BaseModel):
+    id_prueba: int
+    codigo: Optional[str] = None
+    nombre: Optional[str] = None
+    grado: Optional[int] = None
+    grupo: Optional[str] = None
+    tipo_prueba: Optional[str] = None
+    estado: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+class PruebaCreate(BaseModel):
+    id_estudiante: int
+    id_tipo_prueba: int
+    estado: Optional[str] = "Pendiente"

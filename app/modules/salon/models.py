@@ -41,6 +41,7 @@ class Pupitre(Base):
     estado = Column(String(20))
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
     updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now())
+    estudiante = relationship("Estudiante")  # ← agregar esta línea
 
 
 class InventarioLibro(Base):

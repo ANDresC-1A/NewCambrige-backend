@@ -16,7 +16,8 @@ class Auditoria(Base):
 class PeriodoAcademico(Base):
     __tablename__ = "periodo_academico"
     id_periodo = Column(Integer, primary_key=True, index=True)
-    nombre = Column(String(50), nullable=False)
-    anio = Column(Integer, nullable=False)
+    nombre = Column(String(4), nullable=False)
+    fecha_inicio = Column(TIMESTAMP, nullable=False)
+    fecha_fin = Column(TIMESTAMP, nullable=False)
     activo = Column(Boolean, default=True)
 

@@ -14,6 +14,7 @@ from app.core.database import Base
 import app.modules.usuarios.models      # noqa: F401
 import app.modules.auth.models          # noqa: F401
 import app.shared.models                # noqa: F401
+import app.modules.paz_y_salvo.models    # noqa: F401
 import app.modules.salon.models         # noqa: F401
 import app.modules.estudiantes.models   # noqa: F401
 import app.modules.banda.models         # noqa: F401

@@ -6,6 +6,7 @@ from app.core.database import Base
 class Estudiante(Base):
     __tablename__ = "estudiante"
     id_estudiante = Column(Integer, primary_key=True, index=True)
+    documento = Column(String(10), nullable=False)
     nombre = Column(String(100), nullable=False)
     telefono_acudiente = Column(String(20))
     id_salon = Column(Integer, ForeignKey("salon.id_salon"), index=True)

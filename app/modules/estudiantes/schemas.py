@@ -6,6 +6,7 @@ class EstudianteBase(BaseModel):
     nombre: str
     telefono_acudiente: Optional[str] = None
     id_salon: Optional[int] = None
+    documento: Optional[str] = None
 
 class EstudianteCreate(EstudianteBase):
     pass

@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta
+
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
 from sqlalchemy.orm import Session
@@ -80,3 +82,54 @@ def logout(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
     db.commit()
 
     return {"message": "sesion cerrada correctamente"}
+
+@router.get("/check-session")
+def check_session(
+    token: str = Depends(oauth2_scheme),
+    db: Session = Depends(get_db)
+):
+    payload = verificar_token(token)
+
+    if not payload:
+        raise HTTPException(
+            status_code=401,
+            detail="Token inválido"
+        )
+
+    sesion = db.query(SesionUsuario).filter(
+        SesionUsuario.token == token,
+        SesionUsuario.activa == True
+    ).first()
+
+    if not sesion:
+        raise HTTPException(
+            status_code=401,
+            detail="Sesión inválida"
+        )
+
+    ahora = datetime.utcnow()
+
+    #cambiar fuera de fase de producción
+    limite = ahora - timedelta(minutes=1)
+
+    # VERIFICAR INACTIVIDAD
+    if sesion.ultima_actividad < limite:
+
+        sesion.activa = False
+        db.commit()
+
+        raise HTTPException(
+            status_code=401,
+            detail="Sesión expirada por inactividad"
+        )
+
+    # IMPORTANTE:
+    # NO actualizar ultima_actividad
+
+    print("AHORA:", ahora)
+    print("ULTIMA:", sesion.ultima_actividad)
+    print("LIMITE:", limite)
+
+    return {
+        "ok": True
+    }

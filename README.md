@@ -89,6 +89,25 @@ http://localhost:8000/docs
 ```
 ---
 
+> ⚠️ RECUERQUE QUE: Para crear un usuario de prueba (desarrollo) se debe hacer desde BD (query) y la clave debe guardarse hasheada
+
+```bash
+#Ejemplo de como generar una clave hasheada (python)
+
+from passlib.context import CryptContext
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+hash = pwd_context.hash("admin") #entre "" la contraseña que quiere hashea
+print(hash)   # copia este valor
+exit()
+```
+```bash
+/* query para agregar al usuario en BD */ 
+/* pegar la clave hasheada del codigo anterior */
+
+INSERT INTO usuario (nombre, contrasena, created_at)
+VALUES ('admin', '$2b$12$kfR2nz....', NOW());
+```
+
 # 🗄️ Migraciones con Alembic
 
 ## Primera vez (instalación inicial)

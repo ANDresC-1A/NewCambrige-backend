@@ -8,14 +8,14 @@ class SemaforoEstado:
     ROJO = "ROJO"          
 
 class FirmasBase(BaseModel):
-    biblioteca: bool = False
+    banda: bool = False
     tesoreria: bool = False
     uniforme: bool = False
     salon: bool = False
     rectoria: bool = False
 
 class FirmasUpdate(BaseModel):
-    biblioteca: Optional[bool] = None
+    banda: Optional[bool] = None
     tesoreria: Optional[bool] = None
     uniforme: Optional[bool] = None
     salon: Optional[bool] = None
@@ -35,6 +35,7 @@ class DetalleFirma(BaseModel):
     nombre: str
     firmado: bool
     rol_responsable: str
+    no_aplica: bool = False
 
 class EstadoPazSalvoResponse(BaseModel):
     id_estudiante: int
@@ -47,7 +48,7 @@ class EstadoPazSalvoResponse(BaseModel):
     semaforo: Optional [str] = None
     detalle_firmas: Optional[list[DetalleFirma]] = None
     firmas_completadas: Optional [int] = 0
-    total_firmas: Optional [int] = 5
+    total_firmas: Optional [int] = 0
 
 class RectoriaFirmaResponse(BaseModel):
     mensaje: str

@@ -32,7 +32,7 @@ def registrar_pago(db: Session, estudiante_id: int, periodo_id: Optional[int] = 
         "id_estudiante": estudiante_id,
         "id_periodo": periodo_id,
         "tesoreria_firmada": True,
-        "fecha": db.query(FirmasPazYSalvo.updated_at).first()[0]
+        "fecha": firmas.updated_at
     }
 
 def obtener_pagos_pendientes(db: Session, periodo_id: Optional[int] = None) -> List[dict]:

@@ -9,14 +9,16 @@ class UsuarioBase(BaseModel):
 class UsuarioCreate(UsuarioBase):
     password: str
     roles: Optional[List[str]] = None
+    estado: Optional[bool] = True
 
 class UsuarioUpdate(BaseModel):
     nombre: Optional[str] = None
     password: Optional[str] = None
-    activo: Optional[bool] = None
+    estado: Optional[bool] = None
 
 class UsuarioResponse(UsuarioBase):
     id_usuario: int
+    estado: bool
     created_at: Optional[datetime] = None
     roles: List[str] = []
     

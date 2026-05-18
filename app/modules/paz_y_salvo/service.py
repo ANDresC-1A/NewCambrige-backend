@@ -91,10 +91,10 @@ def get_estado_completo(db: Session, estudiante_id: int, periodo_id: Optional[in
         if not periodo:
             return None
         periodo_id = periodo.id_periodo
-        periodo_nombre = f"{periodo.nombre} {periodo.anio}"
+        periodo_nombre = periodo.nombre
     else:
         periodo = db.query(PeriodoAcademico).filter(PeriodoAcademico.id_periodo == periodo_id).first()
-        periodo_nombre = f"{periodo.nombre} {periodo.anio}" if periodo else None
+        periodo_nombre = periodo.nombre if periodo else None
     
     firmas = get_firmas(db, estudiante_id, periodo_id)
     
@@ -139,6 +139,7 @@ def update_firmas(db: Session, estudiante_id: int, periodo_id: Optional[int], da
     db.commit()
     db.refresh(firmas)
     return firmas
+
 
 def get_sin_firmas(db: Session, periodo_id: Optional[int] = None) -> List[dict]:
     if not periodo_id:

@@ -1,11 +1,15 @@
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from fastapi import HTTPException, status
-from app.shared.models import PeriodoAcademico, Auditoria, Usuario  
+from app.shared.models import PeriodoAcademico, Auditoria
+from app.modules.usuarios.models import Usuario  
+from app.modules.salon.models import TipoPrueba  
 from app.core.database import SessionLocal
 from datetime import datetime
 from .schemas import AnioEscolarCreate, AnioEscolarUpdate
 
+
+#PERIODO ACADEMICO
 # ============ LECTURA ============
 def get_anios_all(db: Session) -> List[PeriodoAcademico]:
     return db.query(PeriodoAcademico).order_by(PeriodoAcademico.nombre.desc()).all()
@@ -155,3 +159,46 @@ def verificar_y_ejecutar_cierre_automatico():
         db.rollback()
     finally:
         db.close()
+
+def obtener_id_anio_vigente(db: Session) -> int:
+  
+    periodo = db.query(PeriodoAcademico).filter(PeriodoAcademico.activo == True).first()
+    if not periodo:
+        raise HTTPException(
+            status_code=400, 
+            detail="Operación no permitida: El sistema se encuentra en 'año sin definir'."
+        )
+    return periodo.id_periodo
+
+
+
+#TIPOS DE PRUEBA
+def get_tipos_prueba(db: Session):
+    return db.query(TipoPrueba).order_by(TipoPrueba.id_tipo_prueba.asc()).all()
+
+def update_tipo_prueba(db: Session, id_tipo_prueba: int, datos_in: dict):
+    prueba_obj = db.query(TipoPrueba).filter(TipoPrueba.id_tipo_prueba == id_tipo_prueba).first()
+    if not prueba_obj:
+        return None
+
+    nuevo_min = datos_in["grado_min"]
+    nuevo_max = datos_in["grado_max"]
+
+    solapamiento = db.query(TipoPrueba).filter(
+        TipoPrueba.id_tipo_prueba != id_tipo_prueba, 
+        TipoPrueba.grado_min <= nuevo_max,
+        TipoPrueba.grado_max >= nuevo_min
+    ).first()
+
+    if solapamiento:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="¡Rango Solapado detectado!"
+        )
+
+    prueba_obj.grado_min = nuevo_min
+    prueba_obj.grado_max = nuevo_max
+
+    db.commit()
+    db.refresh(prueba_obj)
+    return prueba_obj

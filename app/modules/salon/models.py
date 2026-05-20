@@ -49,6 +49,8 @@ class InventarioLibro(Base):
     id_libro = Column(Integer, primary_key=True, index=True)
     nombre = Column(String(150), nullable=False)
     autor = Column(String(100), nullable=False)
+    edicion = Column(String(50))
+    estado_fisico = Column(String(50))
     id_salon = Column(Integer, ForeignKey("salon.id_salon"))
     disponible = Column(Boolean, default=True)
 

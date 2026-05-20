@@ -159,8 +159,21 @@ def update_pupitre(db: Session, pupitre_id: int, estado: str) -> Optional[Pupitr
 # ======================
 # 📚 BIBLIOTECA
 # ======================
-def get_all_libros(db: Session) -> List[InventarioLibro]:
-    return db.query(InventarioLibro).all()
+def get_all_libros(db: Session):
+    libros = db.query(InventarioLibro).all()
+
+    return [
+        {
+            "id_libro": l.id_libro,
+            "nombre": l.nombre,
+            "autor": l.autor,
+            "id_salon": l.id_salon,
+            "disponible": l.disponible,
+            "edicion": l.edicion,
+            "estado_fisico": l.estado_fisico,
+        }
+        for l in libros
+    ]
 
 def get_all_prestamos(db: Session) -> list:
     prestamos = (
@@ -179,16 +192,15 @@ def get_all_prestamos(db: Session) -> list:
         salon = e.salon if e else None
 
         resultado.append({
-            "id_prestamo": p.id_prestamo,
             "codigo": e.documento if e else None,
             "nombre": e.nombre if e else None,
             "grado": str(salon.grado) if salon else None,
             "grupo": str(salon.grupo) if salon else None,
             "libro": p.libro.nombre if p.libro else None,
-            "fecha_prestamo": str(p.fecha_prestamo),
-            "fecha_devolucion": str(p.fecha_devolucion),
+            "fecha_prestamo": str(p.fecha_prestamo) if p.fecha_prestamo else None,
+            "fecha_devolucion": str(p.fecha_devolucion) if p.fecha_devolucion else None,
             "estado": p.estado,
-        })
+})
 
     return resultado
 

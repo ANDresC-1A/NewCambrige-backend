@@ -65,6 +65,9 @@ class LibroResponse(BaseModel):
     autor: str
     id_salon: Optional[int] = None
     disponible: bool
+    edicion: Optional[str] = None
+    estado_fisico: Optional[str] = None
+
     class Config:
         from_attributes = True
 
@@ -81,12 +84,15 @@ class LibroUpdate(BaseModel):
     disponible: Optional[bool] = None
 
 class PrestamoResponse(BaseModel):
-    id_prestamo: int
-    id_libro: int
-    id_estudiante: int
-    fecha_prestamo: Optional[date] = None
-    fecha_devolucion: Optional[date] = None
+    codigo: Optional[str] = None
+    nombre: Optional[str] = None
+    grado: Optional[str] = None
+    grupo: Optional[str] = None
+    libro: Optional[str] = None
+    fecha_prestamo: Optional[str] = None
+    fecha_devolucion: Optional[str] = None
     estado: Optional[bool] = None
+
     class Config:
         from_attributes = True
 

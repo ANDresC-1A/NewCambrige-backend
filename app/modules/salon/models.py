@@ -63,3 +63,5 @@ class PrestamoLibro(Base):
     estado = Column(Boolean)
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
     updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now())
+    estudiante = relationship("Estudiante")
+    libro = relationship("InventarioLibro")

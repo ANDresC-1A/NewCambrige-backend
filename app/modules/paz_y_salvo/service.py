@@ -14,6 +14,7 @@ from app.modules.paz_y_salvo.schemas import (
 )
 
 CAMPOS_FIRMAS = ["banda", "tesoreria", "uniforme", "salon", "rectoria"]
+CAMPOS_SALON = ["prueba", "pupitre", "inventario"]
 
 DETALLE_FIRMAS_CONFIG = [
     {"campo": "banda",      "nombre": "Banda",      "rol": "banda"},
@@ -26,6 +27,13 @@ DETALLE_FIRMAS_CONFIG = [
 
 def _get_periodo_activo(db: Session) -> Optional[PeriodoAcademico]:
     return db.query(PeriodoAcademico).filter(PeriodoAcademico.activo == True).first()
+
+def _get_salon(firmas: FirmasPazYSalvo) -> bool:
+    return all(getattr(firmas, c, False) for c in CAMPOS_SALON)
+
+def _set_salon(firmas: FirmasPazYSalvo, value: bool) ->None:
+    for c in CAMPOS_SALON:
+        setattr(firmas, c, value)
 
 def _get_no_aplica(db: Session, estudiante_id: int) -> set:
     no_aplica = set()
@@ -50,7 +58,7 @@ def _calcular_semaforo(firmas: FirmasPazYSalvo, no_aplica: set) -> str:
     campos_que_aplican = [c for c in CAMPOS_FIRMAS if c not in no_aplica]
     if not campos_que_aplican:
         return SemaforoEstado.VERDE
-    valores = [getattr(firmas, c) for c in campos_que_aplican]
+    valores = [_get_salon(firmas) if c == "salon" else getattr(firmas, c) for c in campos_que_aplican]
     total_true = sum(v for v in valores if v)
     if total_true == len(campos_que_aplican):
         return SemaforoEstado.VERDE
@@ -64,7 +72,7 @@ def _construir_detalle_firmas(firmas: FirmasPazYSalvo, no_aplica: set) -> list:
         DetalleFirma(
             nombre=config["nombre"],
             firmado= True if config["campo"] in no_aplica
-                    else getattr(firmas, config["campo"]),
+                    else (_get_salon(firmas) if config["campo"] == "salon" else getattr(firmas, config["campo"])),
             rol_responsable=config["rol"],
             no_aplica=config["campo"] in no_aplica,
         )
@@ -128,7 +136,7 @@ def get_estado_completo(db: Session, estudiante_id: int, periodo_id: Optional[in
         "banda": True if "banda" in no_aplica else firmas.banda,
         "tesoreria": firmas.tesoreria,
         "uniforme": True if "uniforme" in no_aplica else firmas.uniforme,
-        "salon": firmas.salon,
+        "salon": _get_salon(firmas),
         "rectoria": firmas.rectoria
     }
     
@@ -160,7 +168,10 @@ def update_firmas(db: Session, estudiante_id: int, periodo_id: Optional[int], da
     
     for key, value in data.items():
         if value is not None:
-            setattr(firmas, key, value)
+            if key == "salon":
+                _set_salon(firmas, value)
+            else:
+                setattr(firmas, key, value)
     
     db.commit()
     db.refresh(firmas)
@@ -193,7 +204,7 @@ def get_sin_firmas(db: Session, periodo_id: Optional[int] = None) -> List[dict]:
             if not firmas.banda and "banda" not in no_aplica: faltantes.append("banda")
             if not firmas.tesoreria and "tesoreria" not in no_aplica: faltantes.append("tesoreria")
             if not firmas.uniforme and "uniforme" not in no_aplica: faltantes.append("uniforme")
-            if not firmas.salon and "salon" not in no_aplica: faltantes.append("salon")
+            if not _get_salon(firmas) and "salon" not in no_aplica: faltantes.append("salon")
             if not firmas.rectoria and "rectoria" not in no_aplica: faltantes.append("rectoria")
             if faltantes:
                 resultado.append({"id_estudiante": e.id_estudiante, "nombre": e.nombre, "faltan": faltantes})
@@ -216,9 +227,13 @@ def actualizar_firma(db: Session, estudiante_id: int, data: dict, usuario_nombre
 
     campos_actualizados = []
     for campo, valor in data.items():
-        if valor is not None and hasattr(firmas, campo):
-            setattr(firmas, campo, valor)
-            campos_actualizados.append(f"{campo}={valor}")
+        if valor is not None:
+            if campo == "salon":
+                _set_salon(firmas, valor)
+                campos_actualizados.append(f"{campo}={valor}")
+            elif hasattr(firmas, campo):
+                setattr(firmas, campo, valor)
+                campos_actualizados.append(f"{campo}={valor}")
 
     _registrar_auditoria(
         db=db,
@@ -254,7 +269,7 @@ def firmar_rectoria(db: Session, estudiante_id: int, usuario_nombre: str, period
         "uniforme":   "Uniforme",
         "salon":      "Salón",
     }
-    faltantes = [c for c in firmas_previas if not getattr(firmas, c) and c not in no_aplica]
+    faltantes = [c for c in firmas_previas if not (_get_salon(firmas) if c == "salon" else getattr(firmas, c)) and c not in no_aplica]
 
     if faltantes:
         return {
@@ -299,7 +314,7 @@ def get_pendientes(db: Session, periodo_id: Optional[int] = None) -> List[dict]:
     for estudiante in estudiantes:
         firmas = get_firmas(db, estudiante.id_estudiante, periodo_id)
         no_aplica = _get_no_aplica(db, estudiante.id_estudiante)
-        faltantes = [c for c in CAMPOS_FIRMAS if not getattr(firmas, c) and c not in no_aplica]
+        faltantes = [c for c in CAMPOS_FIRMAS if not (_get_salon(firmas) if c == "salon" else getattr(firmas, c)) and c not in no_aplica]
 
         if faltantes:
             campos_aplican = [c for c in CAMPOS_FIRMAS if c not in no_aplica]

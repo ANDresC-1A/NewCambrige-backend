@@ -67,7 +67,17 @@ def obtener_firmas(
     firmas = service.get_firmas(db, estudiante_id, periodo_id_validado)
     if not firmas:
         raise HTTPException(status_code=404, detail="No se encontraron firmas")
-    return firmas
+    return {
+        "id_firma": firmas.id_firma,
+        "id_estudiante": firmas.id_estudiante,
+        "id_periodo": firmas.id_periodo,
+        "banda": firmas.banda,
+        "tesoreria": firmas.tesoreria,
+        "uniforme": firmas.uniforme,
+        "rectoria": firmas.rectoria,
+        "salon": service._get_salon(firmas),
+        "updated_at": firmas.updated_at,
+    }
 
 @router.put("/firmas/{estudiante_id}", response_model=FirmasResponse)
 def actualizar_firmas(
@@ -86,7 +96,17 @@ def actualizar_firmas(
     firmas = service.update_firmas(db, estudiante_id, periodo_id_validado, data.model_dump(exclude_unset=True))
     if not firmas:
         raise HTTPException(status_code=404, detail="Estudiante o periodo no encontrado")
-    return firmas
+    return {
+        "id_firma": firmas.id_firma,
+        "id_estudiante": firmas.id_estudiante,
+        "id_periodo": firmas.id_periodo,
+        "banda": firmas.banda,
+        "tesoreria": firmas.tesoreria,
+        "uniforme": firmas.uniforme,
+        "rectoria": firmas.rectoria,
+        "salon": service._get_salon(firmas),
+        "updated_at": firmas.updated_at,
+    }
 
 @router.post("/rectoria/{estudiante_id}", response_model=RectoriaFirmaResponse, summary="Firma final de Rectoría")
 def firmar_rectoria(

@@ -11,6 +11,8 @@ from alembic import op
 import sqlalchemy as sa
 
 
+
+
 # revision identifiers, used by Alembic.
 revision: str = 'aef06b351c56'
 down_revision: Union[str, None] = 'b023178abd10'
@@ -43,7 +45,7 @@ def upgrade() -> None:
                existing_nullable=False)
     op.drop_column('periodo_academico', 'anio')
     op.add_column('usuario', sa.Column('estado', sa.Boolean(), nullable=False))
-    # ### end Alembic commands ###
+   
 
 
 def downgrade() -> None:

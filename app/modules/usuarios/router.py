@@ -121,7 +121,7 @@ def crear_rol(
 def obtener_roles_usuario(
     usuario_id: int,
     db: Session = Depends(get_db),
-    current_user = Depends(require_roles(["admin"]))
+    current_user = Depends(require_roles(["admin", "uniformes", "secretaria", "tesoreria","titular", "rectoria"]))
 ):
     """Obtener roles de un usuario - Solo admin"""
     usuario = service.get_usuario_by_id(db, usuario_id)

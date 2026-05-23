@@ -20,6 +20,7 @@ class TipoPrueba(Base):
     nombre = Column(String(100), nullable=False)
     grado_min = Column(Integer)
     grado_max = Column(Integer)
+    descripcion = Column(String(150))
 
 
 class Prueba(Base):

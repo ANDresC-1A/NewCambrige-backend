@@ -14,7 +14,7 @@ def listar_estudiantes(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
     db: Session = Depends(get_db),
-    current_user = Depends(require_roles(["admin", "titular", "secretaria", "banda"]))
+    current_user = Depends(require_roles(["admin", "titular", "secretaria", "banda", "tesoreria","uniformes", "rectoria"]))
 ):
     return service.get_all(db, skip, limit)
 

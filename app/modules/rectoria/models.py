@@ -8,7 +8,7 @@ class FirmasPazYSalvo(Base):
     id_firma = Column(Integer, primary_key=True, index=True)
     id_estudiante = Column(Integer, ForeignKey("estudiante.id_estudiante"))
     id_periodo = Column(Integer, ForeignKey("periodo_academico.id_periodo"))
-    biblioteca = Column(Boolean, default=False)
+    banda = Column(Boolean, default=False)
     prueba = Column(Boolean, default=False)
     pupitre = Column(Boolean, default=False)
     tesoreria = Column(Boolean, default=False)

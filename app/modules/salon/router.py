@@ -97,7 +97,7 @@ def actualizar_pupitre(
     pupitre_id: int, data: PupitreUpdate,
     db: Session = Depends(get_db),
 ):
-    pupitre = service.update_pupitre(db, pupitre_id, data.pago)
+    pupitre = service.update_pupitre(db, pupitre_id, data.estado)
     if not pupitre:
         raise HTTPException(status_code=404, detail="Pupitre no encontrado")
     return pupitre

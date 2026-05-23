@@ -131,7 +131,7 @@ def get_all_pupitres(db: Session) -> list:
             "nombre": e.nombre if e else None,
             "grado": str(salon.grado) if salon else None,
             "grupo": str(salon.grupo) if salon else None,
-            "pago": p.estado,
+            "estado": p.estado,
             "fecha_pago": (
                 p.updated_at.strftime("%d/%m/%Y")
                 if p.estado == "Pagado" and p.updated_at
@@ -149,7 +149,7 @@ def update_pupitre(db: Session, pupitre_id: int, estado: str) -> Optional[Pupitr
     if not pupitre:
         return None
 
-    pupitre.estado = pago
+    pupitre.estado = estado
 
     db.commit()
     db.refresh(pupitre)

@@ -1,5 +1,7 @@
 from sqlalchemy.orm import Session
 from typing import List, Optional
+
+
 from fastapi import HTTPException, status
 from app.shared.models import PeriodoAcademico, Auditoria
 from app.modules.usuarios.models import Usuario  

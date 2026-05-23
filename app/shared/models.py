@@ -20,4 +20,3 @@ class PeriodoAcademico(Base):
     fecha_inicio = Column(TIMESTAMP, nullable=False)
     fecha_fin = Column(TIMESTAMP, nullable=False)
     activo = Column(Boolean, default=True)
-

@@ -10,7 +10,7 @@ from app.modules.uniformes.router import router as uniformes_router
 from app.modules.paz_y_salvo.router import router as paz_salvo_router
 from app.modules.secretaria.router import router as secretaria_router
 #from app.modules.rectoria.router import router as rectoria_router
-#from app.modules.parametrizacion.router import router as parametrizacion_router
+from app.modules.parametrizacion.router import router as parametrizacion_router
 
 # Lista de routers para registrar fácilmente
 routers = [
@@ -24,5 +24,5 @@ routers = [
     (paz_salvo_router, "/api/paz-salvo", "Paz y Salvo"),
     (secretaria_router, "/api/secretaria", "Secretaria"),
     #(rectoria_router, "/api/rectoria", "Rectoria"),
-    #(parametrizacion_router, "/api/parametros", "Parametrizacion"),
+    (parametrizacion_router, "/api/parametros", "Parametrizacion"),
 ]

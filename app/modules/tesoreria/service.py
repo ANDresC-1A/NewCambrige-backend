@@ -1,3 +1,4 @@
+from app.modules.tesoreria.models import Matricula
 from sqlalchemy.orm import Session
 from typing import Optional, List
 from app.modules.estudiantes.models import Estudiante
@@ -25,6 +26,13 @@ def registrar_pago(db: Session, estudiante_id: int, periodo_id: Optional[int] = 
         db.add(firmas)
     else:
         firmas.tesoreria = True
+    
+    matricula = Matricula(
+            id_estudiante=estudiante_id,
+            id_periodo=periodo_id,
+            estado="pagado"
+        )
+    db.add(matricula)
     
     db.commit()
     

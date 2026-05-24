@@ -62,9 +62,9 @@ def obtener_matricula(
 def crear_matricula(
     data: MatriculaCreate,
     db: Session = Depends(get_db),
-    current_user = Depends(require_roles(["admin", "secretaria"]))
+    current_user = Depends(require_roles(["admin", "secretaria", "tesorero"]))
 ):
-    return service.create_matricula(db, data.model_dump())
+    return service.create_matricula(db, data.model_dump(), current_user.nombre)
 
 @router.put("/matriculas/{matricula_id}", response_model=MatriculaResponse)
 def actualizar_matricula(

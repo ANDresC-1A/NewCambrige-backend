@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 from typing import Optional, List
 from app.modules.tesoreria.models import Matricula, DetalleMatricula,TipoConcepto
-
+from app.shared.models import Auditoria
 # ============ MATRÍCULAS ============
 def get_matriculas_all(db: Session, skip: int = 0, limit: int = 100) -> List[Matricula]:
     return db.query(Matricula).offset(skip).limit(limit).all()
@@ -18,13 +18,23 @@ def get_matriculas_por_periodo(db: Session, periodo_id: int) -> List[Matricula]:
 def get_matriculas_pendientes(db: Session) -> List[Matricula]:
     return db.query(Matricula).filter(Matricula.estado == "pendiente").all()
 
-def create_matricula(db: Session, data: dict) -> Matricula:
+def create_matricula(db: Session, data: dict, current_user_name: str) -> Matricula:
     matricula = Matricula(**data)
     db.add(matricula)
-    db.commit()
-    db.refresh(matricula)
-    
-    return matricula
+    try:
+        db.commit()
+        auditoria = Auditoria(
+            tabla = "matricula",
+            id_registro = matricula.id_matricula,
+            accion= "Insert",
+            usuario = current_user_name
+        )
+        db.add(auditoria)
+        db.commit()
+        db.refresh(matricula)
+        return matricula
+    except Exception as e:
+        db.rollback()
 
 def update_matricula(db: Session, matricula_id: int, data: dict) -> Optional[Matricula]:
     matricula = get_matricula_by_id(db, matricula_id)

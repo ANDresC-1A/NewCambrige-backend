@@ -60,6 +60,9 @@ def get_detalle_by_id(db: Session, detalle_id: int) -> Optional[DetalleMatricula
 def get_detalle_by_periodo(db: Session,  periodo_id: int,skip: int = 0, limit: int = 100) -> List[DetalleMatricula]:
     return db.query(DetalleMatricula).join(Matricula, Matricula.id_matricula == DetalleMatricula.id_matricula).filter(Matricula.id_periodo == periodo_id).offset(skip).limit(limit).all()
 
+def get_detalle_by_periodo_tipo(db: Session,  periodo_id: int,id_tipo:int,skip: int = 0, limit: int = 100) -> List[DetalleMatricula]:
+    return db.query(DetalleMatricula).join(Matricula, Matricula.id_matricula == DetalleMatricula.id_matricula).filter(Matricula.id_periodo == periodo_id).filter(DetalleMatricula.id_tipo == id_tipo).offset(skip).limit(limit).all()
+
 def create_detalle(db: Session, data: dict) -> DetalleMatricula:
     detalle = DetalleMatricula(**data)
     db.add(detalle)
@@ -92,6 +95,7 @@ def get_tipos_all(db: Session, skip: int = 0, limit: int = 100) -> List[TipoConc
 
 def get_tipo_by_id(db: Session, tipo_id: int) -> Optional[TipoConcepto]:
     return db.query(TipoConcepto).filter(TipoConcepto.id_tipo == tipo_id).first()
+
 
 def create_tipo(db: Session, data: dict) -> TipoConcepto:
     tipo = TipoConcepto(**data)

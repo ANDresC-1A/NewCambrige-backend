@@ -103,9 +103,20 @@ def detalles_por_periodo(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
     db: Session = Depends(get_db),
-    current_user = Depends(require_roles(["admin", "secretaria", "titular"]))
+    current_user = Depends(require_roles(["admin", "secretaria", "titular","tesorero"]))
 ):
     return service.get_detalle_by_periodo(db, periodo_id, skip, limit)
+
+@router.get("/detalles-matricula/periodo/tipo-detalle/", response_model=List[DetalleMatriculaResponse])
+def detalles_por_periodo_tipos(
+    periodo_id: int,
+    id_tipo: int,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
+    db: Session = Depends(get_db),
+    current_user = Depends(require_roles(["admin", "secretaria", "titular", "tesorero"]))
+):
+    return service.get_detalle_by_periodo_tipo(db, periodo_id,id_tipo, skip, limit)
 
 
 

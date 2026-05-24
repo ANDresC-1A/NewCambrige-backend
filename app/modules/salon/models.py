@@ -40,7 +40,7 @@ class Pupitre(Base):
     __tablename__ = "pupitres"
     id_mantenimiento = Column(Integer, primary_key=True, index=True)
     id_estudiante = Column(Integer, ForeignKey("estudiante.id_estudiante"))
-    estado = Column(String(20))
+    estado = Column(Boolean)
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
     updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now())
     estudiante = relationship("Estudiante")  # ← agregar esta línea
@@ -52,9 +52,9 @@ class InventarioLibro(Base):
     nombre = Column(String(150), nullable=False)
     autor = Column(String(100), nullable=False)
     edicion = Column(String(50))
-    estado_fisico = Column(String(50))
+    estado_fisico = Column(String(100))
     id_salon = Column(Integer, ForeignKey("salon.id_salon"))
-    disponible = Column(Boolean, default=True)
+    disponible = Column(Boolean, default=True, nullable=False)
 
 
 class PrestamoLibro(Base):

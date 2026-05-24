@@ -97,6 +97,18 @@ def detalles_por_matricula(
 ):
     return service.get_detalles_by_matricula(db, matricula_id)
 
+@router.get("/detalles-matricula/periodo/{periodo_id}", response_model=List[DetalleMatriculaResponse])
+def detalles_por_periodo(
+    periodo_id: int,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
+    db: Session = Depends(get_db),
+    current_user = Depends(require_roles(["admin", "secretaria", "titular"]))
+):
+    return service.get_detalle_by_periodo(db, periodo_id, skip, limit)
+
+
+
 @router.get("/detalles-matricula/{detalle_id}", response_model=DetalleMatriculaResponse)
 def obtener_detalle(
     detalle_id: int,

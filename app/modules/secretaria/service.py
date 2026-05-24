@@ -57,6 +57,9 @@ def get_detalles_by_matricula(db: Session, matricula_id: int) -> List[DetalleMat
 def get_detalle_by_id(db: Session, detalle_id: int) -> Optional[DetalleMatricula]:
     return db.query(DetalleMatricula).filter(DetalleMatricula.id_detalle == detalle_id).first()
 
+def get_detalle_by_periodo(db: Session,  periodo_id: int,skip: int = 0, limit: int = 100) -> List[DetalleMatricula]:
+    return db.query(DetalleMatricula).join(Matricula, Matricula.id_matricula == DetalleMatricula.id_matricula).filter(Matricula.id_periodo == periodo_id).offset(skip).limit(limit).all()
+
 def create_detalle(db: Session, data: dict) -> DetalleMatricula:
     detalle = DetalleMatricula(**data)
     db.add(detalle)

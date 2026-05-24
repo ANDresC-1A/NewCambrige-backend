@@ -26,14 +26,13 @@ class MatriculaResponse(MatriculaBase):
 class DetalleMatriculaBase(BaseModel):
     id_matricula: int
     id_tipo: int
-    descripcion: Optional[str] = None
     estado: str = "pendiente"
+    mes: str
 
 class DetalleMatriculaCreate(DetalleMatriculaBase):
     pass
 
 class DetalleMatriculaUpdate(BaseModel):
-    descripcion: Optional[str] = None
     estado: Optional[str] = None
 
 class DetalleMatriculaResponse(DetalleMatriculaBase):

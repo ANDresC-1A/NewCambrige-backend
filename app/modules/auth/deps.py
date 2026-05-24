@@ -21,6 +21,7 @@ def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
     
+    
     # Verificar sesión activa en BD
     sesion = db.query(SesionUsuario).filter(
         SesionUsuario.token == token,

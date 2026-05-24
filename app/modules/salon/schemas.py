@@ -1,26 +1,6 @@
 from pydantic import BaseModel
 from typing import Optional
-from datetime import date, datetime
-
-class SalonBase(BaseModel):
-    grado: int
-    grupo: int
-    id_usuario: Optional[int] = None
-    id_periodo: Optional[int] = None
-
-class SalonCreate(SalonBase):
-    pass
-
-class SalonUpdate(BaseModel):
-    grado: Optional[int] = None
-    grupo: Optional[int] = None
-    id_usuario: Optional[int] = None
-    id_periodo: Optional[int] = None
-
-class SalonResponse(SalonBase):
-    id_salon: int
-    class Config:
-        from_attributes = True
+from datetime import date
 
 # ======================
 # 🧪 PRUEBAS
@@ -32,16 +12,18 @@ class PruebaResponse(BaseModel):
     grado: Optional[str] = None
     grupo: Optional[str] = None
     tipo_prueba: Optional[str] = None
-    estado: Optional[bool] = None
-    fecha_pago: Optional[date] = None   # NUEVO
+    estado: Optional[str] = None   # CAMBIO AQUÍ
+    fecha_pago: Optional[date] = None
 
     class Config:
         from_attributes = True
+
 
 class PruebaCreate(BaseModel):
     id_estudiante: int
     id_tipo_prueba: int
     estado: Optional[str] = "Pendiente"
+
 
 # ======================
 # 🪑 PUPITRES
@@ -51,12 +33,15 @@ class PupitreResponse(BaseModel):
     id_estudiante: int
     codigo: Optional[str] = None
     nombre: Optional[str] = None
-    estado: Optional[bool] = None
+    estado: Optional[str] = None   # CAMBIO AQUÍ
+
     class Config:
         from_attributes = True
 
+
 class PupitreUpdate(BaseModel):
-    estado: bool
+    estado: str   # 🔥 CAMBIO AQUÍ
+
 
 # ======================
 # 📚 BIBLIOTECA
@@ -66,12 +51,13 @@ class LibroResponse(BaseModel):
     nombre: str
     autor: str
     id_salon: Optional[int] = None
-    disponible: bool
+    disponible: Optional[bool] = True
     edicion: Optional[str] = None
     estado_fisico: Optional[str] = None
 
     class Config:
         from_attributes = True
+
 
 class LibroCreate(BaseModel):
     nombre: str
@@ -79,11 +65,13 @@ class LibroCreate(BaseModel):
     id_salon: Optional[int] = None
     disponible: Optional[bool] = True
 
+
 class LibroUpdate(BaseModel):
     nombre: Optional[str] = None
     autor: Optional[str] = None
     id_salon: Optional[int] = None
     disponible: Optional[bool] = None
+
 
 class PrestamoResponse(BaseModel):
     codigo: Optional[str] = None
@@ -93,14 +81,12 @@ class PrestamoResponse(BaseModel):
     libro: Optional[str] = None
     fecha_prestamo: Optional[str] = None
     fecha_devolucion: Optional[str] = None
-    estado: Optional[bool] = None
+    estado: Optional[str] = None   #  CAMBIO AQUÍ
 
-    class Config:
-        from_attributes = True
 
 class PrestamoCreate(BaseModel):
     id_libro: int
     id_estudiante: int
     fecha_prestamo: Optional[date] = None
     fecha_devolucion: Optional[date] = None
-    estado: Optional[bool] = True
+    estado: Optional[str] = "Pendiente"   #CAMBIO AQUI

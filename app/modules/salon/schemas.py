@@ -33,6 +33,8 @@ class PruebaResponse(BaseModel):
     grupo: Optional[str] = None
     tipo_prueba: Optional[str] = None
     estado: Optional[str] = None
+    fecha_pago: Optional[date] = None   # NUEVO
+    
     class Config:
         from_attributes = True
 

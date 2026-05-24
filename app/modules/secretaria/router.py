@@ -18,9 +18,11 @@ def listar_matriculas(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
     db: Session = Depends(get_db),
-    current_user = Depends(require_roles(["admin", "secretaria", "titular"]))
+    current_user = Depends(require_roles(["admin", "secretaria", "tesoreria"]))
 ):
     return service.get_matriculas_all(db, skip, limit)
+
+
 
 @router.get("/matriculas/estudiante/{estudiante_id}", response_model=List[MatriculaResponse])
 def matriculas_por_estudiante(
@@ -34,7 +36,7 @@ def matriculas_por_estudiante(
 def matriculas_por_periodo(
     periodo_id: int,
     db: Session = Depends(get_db),
-    current_user = Depends(require_roles(["admin", "secretaria", "titular"]))
+    current_user = Depends(require_roles(["admin", "secretaria", "titular", "tesorero"]))
 ):
     return service.get_matriculas_por_periodo(db, periodo_id)
 

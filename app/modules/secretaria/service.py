@@ -23,6 +23,7 @@ def create_matricula(db: Session, data: dict) -> Matricula:
     db.add(matricula)
     db.commit()
     db.refresh(matricula)
+    
     return matricula
 
 def update_matricula(db: Session, matricula_id: int, data: dict) -> Optional[Matricula]:

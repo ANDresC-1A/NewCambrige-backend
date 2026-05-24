@@ -17,6 +17,17 @@ def listar_salones(
 ):
     return service.get_all(db, skip, limit)
 
+@router.get("/periodo/{id_periodo}", response_model=List[SalonResponse])
+def listar_salones_por_periodo(
+    id_periodo: int,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
+    db: Session = Depends(get_db),
+    current_user = Depends(require_roles(["admin", "secretaria", "tesoreria"]))
+):
+    return service.get_salon_all_by_periodo(db, id_periodo,skip, limit)
+
+
 @router.get("/{salon_id}", response_model=SalonResponse)
 def obtener_salon(
     salon_id: int,

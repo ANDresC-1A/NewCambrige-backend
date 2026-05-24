@@ -43,8 +43,8 @@ class Prueba(Base):
     id_estudiante = Column(Integer, ForeignKey("estudiante.id_estudiante"))
     id_tipo_prueba = Column(Integer, ForeignKey("tipo_prueba.id_tipo_prueba"))
 
-    # CAMBIO IMPORTANTE: BOOLEAN OK (pagado / no pagado)
-    estado = Column(Boolean, default=False)
+   
+    estado = Column(String(20), nullable=True)
 
     fecha_pago = Column(Date, nullable=True)
 

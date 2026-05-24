@@ -32,9 +32,9 @@ class PruebaResponse(BaseModel):
     grado: Optional[str] = None
     grupo: Optional[str] = None
     tipo_prueba: Optional[str] = None
-    estado: Optional[str] = None
+    estado: Optional[bool] = None
     fecha_pago: Optional[date] = None   # NUEVO
-    
+
     class Config:
         from_attributes = True
 

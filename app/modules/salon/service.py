@@ -78,6 +78,10 @@ def get_all_pruebas(db: Session) -> list:
             "grupo": str(salon.grupo) if salon else None,
             "tipo_prueba": p.tipo_prueba.nombre if p.tipo_prueba else None,
             "estado": p.estado,
+            "fecha_pago":p.fecha_pago, 
+
+
+            
         })
 
     return resultado

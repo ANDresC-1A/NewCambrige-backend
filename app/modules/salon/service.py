@@ -1,5 +1,6 @@
 from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional
+from datetime import date
 from app.modules.salon.models import (
     Salon, Prueba, TipoPrueba, Pupitre, InventarioLibro, PrestamoLibro
 )
@@ -131,18 +132,18 @@ def get_all_pupitres(db: Session) -> list:
             "nombre": e.nombre if e else None,
             "grado": str(salon.grado) if salon else None,
             "grupo": str(salon.grupo) if salon else None,
-            "estado": p.estado,  # STRING
+            "estado": p.estado,
             "fecha_pago": (
-                p.updated_at.strftime("%d/%m/%Y")
-                if p.estado == "PAGADO" and p.updated_at
-                else ""
+                p.fecha_pago.strftime("%d/%m/%Y")
+                if p.estado == "visto" and p.fecha_pago  # 👈 Cambio: "visto" en lugar de "PAGADO"
+                else None
             ),
         })
 
     return resultado
 
 
-def update_pupitre(db: Session, pupitre_id: int, estado: str) -> Optional[Pupitre]:
+def update_pupitre(db: Session, pupitre_id: int, estado: str, fecha_pago: Optional[date] = None) -> Optional[Pupitre]:
     pupitre = db.query(Pupitre).filter(
         Pupitre.id_mantenimiento == pupitre_id
     ).first()
@@ -151,6 +152,9 @@ def update_pupitre(db: Session, pupitre_id: int, estado: str) -> Optional[Pupitr
         return None
 
     pupitre.estado = estado
+    
+    if fecha_pago:  # 👈 Ahora recibe el parámetro
+        pupitre.fecha_pago = fecha_pago
 
     db.commit()
     db.refresh(pupitre)
@@ -201,7 +205,7 @@ def get_all_prestamos(db: Session) -> list:
             "libro": p.libro.nombre if p.libro else None,
             "fecha_prestamo": str(p.fecha_prestamo) if p.fecha_prestamo else None,
             "fecha_devolucion": str(p.fecha_devolucion) if p.fecha_devolucion else None,
-            "estado": p.estado,  # STRING
+            "estado": p.estado,
         })
 
     return resultado

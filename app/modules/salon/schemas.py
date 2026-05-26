@@ -59,7 +59,8 @@ class PupitreResponse(BaseModel):
     id_estudiante: int
     codigo: Optional[str] = None
     nombre: Optional[str] = None
-    estado: Optional[str] = None   # CAMBIO AQUÍ
+    estado: Optional[str] = None  
+    fecha_pago: Optional[date] # CAMBIO AQUÍ
 
     class Config:
         from_attributes = True
@@ -67,6 +68,7 @@ class PupitreResponse(BaseModel):
 
 class PupitreUpdate(BaseModel):
     estado: str   # 🔥 CAMBIO AQUÍ
+    fecha_pago: Optional[date] = None
 
 
 # ======================

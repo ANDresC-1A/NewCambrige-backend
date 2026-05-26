@@ -66,7 +66,7 @@ class Pupitre(Base):
 
     # BOOLEAN CORRECTO
     estado = Column(String(20), nullable=True)
-
+    fecha_pago = Column(Date, nullable=True)  #  NUEVO CAMPO
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
     updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now())
 

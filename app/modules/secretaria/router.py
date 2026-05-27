@@ -18,9 +18,11 @@ def listar_matriculas(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
     db: Session = Depends(get_db),
-    current_user = Depends(require_roles(["admin", "secretaria", "titular"]))
+    current_user = Depends(require_roles(["admin", "secretaria", "tesoreria"]))
 ):
     return service.get_matriculas_all(db, skip, limit)
+
+
 
 @router.get("/matriculas/estudiante/{estudiante_id}", response_model=List[MatriculaResponse])
 def matriculas_por_estudiante(
@@ -34,7 +36,7 @@ def matriculas_por_estudiante(
 def matriculas_por_periodo(
     periodo_id: int,
     db: Session = Depends(get_db),
-    current_user = Depends(require_roles(["admin", "secretaria", "titular"]))
+    current_user = Depends(require_roles(["admin", "secretaria", "titular", "tesorero"]))
 ):
     return service.get_matriculas_por_periodo(db, periodo_id)
 
@@ -60,9 +62,9 @@ def obtener_matricula(
 def crear_matricula(
     data: MatriculaCreate,
     db: Session = Depends(get_db),
-    current_user = Depends(require_roles(["admin", "secretaria"]))
+    current_user = Depends(require_roles(["admin", "secretaria", "tesoreria"]))
 ):
-    return service.create_matricula(db, data.model_dump())
+    return service.create_matricula(db, data.model_dump(), current_user.nombre)
 
 @router.put("/matriculas/{matricula_id}", response_model=MatriculaResponse)
 def actualizar_matricula(
@@ -95,6 +97,29 @@ def detalles_por_matricula(
 ):
     return service.get_detalles_by_matricula(db, matricula_id)
 
+@router.get("/detalles-matricula/periodo/{periodo_id}", response_model=List[DetalleMatriculaResponse])
+def detalles_por_periodo(
+    periodo_id: int,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
+    db: Session = Depends(get_db),
+    current_user = Depends(require_roles(["admin", "secretaria", "titular","tesorero"]))
+):
+    return service.get_detalle_by_periodo(db, periodo_id, skip, limit)
+
+@router.get("/detalles-matricula/periodo/tipo-detalle/", response_model=List[DetalleMatriculaResponse])
+def detalles_por_periodo_tipos(
+    periodo_id: int,
+    id_tipo: int,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
+    db: Session = Depends(get_db),
+    current_user = Depends(require_roles(["admin", "secretaria", "titular", "tesorero"]))
+):
+    return service.get_detalle_by_periodo_tipo(db, periodo_id,id_tipo, skip, limit)
+
+
+
 @router.get("/detalles-matricula/{detalle_id}", response_model=DetalleMatriculaResponse)
 def obtener_detalle(
     detalle_id: int,
@@ -110,9 +135,17 @@ def obtener_detalle(
 def crear_detalle(
     data: DetalleMatriculaCreate,
     db: Session = Depends(get_db),
-    current_user = Depends(require_roles(["admin", "secretaria"]))
-):
-    return service.create_detalle(db, data.model_dump())
+    current_user = Depends(require_roles(["admin", "secretaria", "tesoreria"]))
+):  
+    meses = [
+    "enero", "febrero", "marzo", "abril", "mayo", "junio",
+    "julio", "agosto", "septiembre", "octubre", "noviembre"]
+    if data.mes not in meses:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"El mes '{data.mes}' no es válido. Debe ser uno de: {meses}"
+        )
+    return service.create_detalle(db, data.model_dump(),current_user.nombre)
 
 @router.put("/detalles-matricula/{detalle_id}", response_model=DetalleMatriculaResponse)
 def actualizar_detalle(
@@ -141,7 +174,7 @@ def listar_tipos(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
     db: Session = Depends(get_db),
-    current_user = Depends(require_roles(["admin", "secretaria"]))
+    current_user = Depends(require_roles(["admin", "secretaria", "tesoreria"]))
 ):
     return service.get_tipos_all(db, skip, limit)
 

@@ -63,12 +63,24 @@ def get_detalle_by_periodo(db: Session,  periodo_id: int,skip: int = 0, limit: i
 def get_detalle_by_periodo_tipo(db: Session,  periodo_id: int,id_tipo:int,skip: int = 0, limit: int = 100) -> List[DetalleMatricula]:
     return db.query(DetalleMatricula).join(Matricula, Matricula.id_matricula == DetalleMatricula.id_matricula).filter(Matricula.id_periodo == periodo_id).filter(DetalleMatricula.id_tipo == id_tipo).offset(skip).limit(limit).all()
 
-def create_detalle(db: Session, data: dict) -> DetalleMatricula:
+def create_detalle(db: Session ,data: dict,current_user_name:str) -> DetalleMatricula:
     detalle = DetalleMatricula(**data)
     db.add(detalle)
-    db.commit()
-    db.refresh(detalle)
-    return detalle
+    try:
+        db.commit()
+        auditoria = Auditoria(
+            tabla = "detalle_matricula",
+            id_registro = detalle.id_detalle,
+            accion= "Insert",
+            usuario = current_user_name
+        )
+        db.add(auditoria)
+        db.commit()
+        db.refresh(detalle)
+        return detalle
+    except Exception as e:
+        db.rollback()
+   
 
 def update_detalle(db: Session, detalle_id: int, data: dict) -> Optional[DetalleMatricula]:
     detalle = get_detalle_by_id(db, detalle_id)

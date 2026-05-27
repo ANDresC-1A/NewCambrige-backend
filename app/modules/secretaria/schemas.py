@@ -26,7 +26,7 @@ class MatriculaResponse(MatriculaBase):
 class DetalleMatriculaBase(BaseModel):
     id_matricula: int
     id_tipo: int
-    estado: str = "pendiente"
+    estado: str = "activa"
     mes: str
 
 class DetalleMatriculaCreate(DetalleMatriculaBase):

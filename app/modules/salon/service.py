@@ -135,7 +135,7 @@ def get_all_pupitres(db: Session) -> list:
             "estado": p.estado,
             "fecha_pago": (
                 p.fecha_pago.strftime("%d/%m/%Y")
-                if p.estado == "Pagado" and p.fecha_pago  #  Cambio: "visto" en lugar de "PAGADO"
+                if p.estado == "visto" and p.fecha_pago  #  Cambio: "visto" en lugar de "PAGADO"
                 else None
             ),
         })

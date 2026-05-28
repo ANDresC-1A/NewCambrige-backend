@@ -196,8 +196,13 @@ def update_firmas(db: Session, estudiante_id: int, periodo_id: Optional[int], da
         periodo_id = periodo.id_periodo
     
     firmas = get_firmas(db, estudiante_id, periodo_id)
-    
+    no_aplica = _get_no_aplica(db, estudiante_id)
+
     for key, value in data.items():
+        if key in no_aplica:
+            if value == True:
+                raise ValueError(f"No se puede firmar '{key}' porque no aplica para este estudiante")
+            continue
         if value is not None:
             d = _get_detalle(firmas, CAMPO_TIPO_MAP.get(key))
             if d:
@@ -207,71 +212,6 @@ def update_firmas(db: Session, estudiante_id: int, periodo_id: Optional[int], da
     db.refresh(firmas)
     return firmas
 
-
-def get_sin_firmas(db: Session, periodo_id: Optional[int] = None) -> List[dict]:
-    if not periodo_id:
-        periodo = _get_periodo_activo(db)
-        if not periodo:
-            return []
-        periodo_id = periodo.id_periodo
-    
-    estudiantes = db.query(Estudiante).all()
-    resultado = []
-    
-    for e in estudiantes:
-        firmas = db.query(FirmasPazYSalvo).filter(
-            FirmasPazYSalvo.id_estudiante == e.id_estudiante,
-            FirmasPazYSalvo.id_periodo == periodo_id
-        ).first()
-        
-        no_aplica = _get_no_aplica(db, e.id_estudiante)
-
-        if not firmas:
-            faltantes_reales = [c for c in CAMPOS_FIRMAS if c not in no_aplica]
-            resultado.append({"id_estudiante": e.id_estudiante, "nombre": e.nombre, "faltan": faltantes_reales})
-        else:
-            faltantes = []
-            for c in CAMPOS_FIRMAS:
-                if c not in no_aplica and not _get_valor_campo(firmas, c):
-                    faltantes.append(c)
-            if faltantes:
-                resultado.append({"id_estudiante": e.id_estudiante, "nombre": e.nombre, "faltan": faltantes})
-    
-    return resultado
-
-
-def actualizar_firma(db: Session, estudiante_id: int, data: dict, usuario_nombre: str, periodo_id: Optional[int] = None) -> Optional[FirmasPazYSalvo]:
-    estudiante = db.query(Estudiante).filter(Estudiante.id_estudiante == estudiante_id).first()
-    if not estudiante:
-        return None
-
-    if not periodo_id:
-        periodo = _get_periodo_activo(db)
-        if not periodo:
-            return None
-        periodo_id = periodo.id_periodo
-
-    firmas = get_firmas(db, estudiante_id, periodo_id)
-
-    campos_actualizados = []
-    for campo, valor in data.items():
-        if valor is not None:
-            d = _get_detalle(firmas, CAMPO_TIPO_MAP.get(campo))
-            if d:
-                d.estado = valor
-                campos_actualizados.append(f"{campo}={valor}")
-
-    _registrar_auditoria(
-        db=db,
-        usuario=usuario_nombre,
-        accion=f"FIRMA: {', '.join(campos_actualizados)}"[:50],
-        tabla="firmas_paz_y_salvo",
-        id_registro=firmas.id_firma,
-    )
-
-    db.commit()
-    db.refresh(firmas)
-    return firmas
 
 
 def firmar_rectoria(db: Session, estudiante_id: int, usuario_nombre: str, periodo_id: Optional[int] = None) -> dict:

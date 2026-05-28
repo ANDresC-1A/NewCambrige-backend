@@ -6,7 +6,7 @@ from app.core.database import get_db
 from .schemas import AnioEscolarCreate, AnioEscolarRead, AnioEscolarUpdate, TipoPruebaUpdate, TipoPruebaRead
 from .service import crear_anio_escolar, get_anios_all, update_anio_escolar, get_tipos_prueba, update_tipo_prueba
 
-router = APIRouter(prefix="/parametrizacion", tags=["Parametrización"])
+router = APIRouter(tags=["Parametrización"])
 
 #PERIDO ACADEMICO
 @router.post("/anio-escolar", response_model=AnioEscolarRead, status_code=status.HTTP_201_CREATED)

@@ -4,7 +4,7 @@ from typing import Optional, List
 from app.core.database import get_db
 from app.modules.tesoreria import service
 from app.modules.auth.deps import require_roles
-from app.modules.rectoria.models import FirmasPazYSalvo
+from app.modules.paz_y_salvo.models import FirmasPazYSalvo
 router = APIRouter()
 
 @router.post("/registrar-pago")

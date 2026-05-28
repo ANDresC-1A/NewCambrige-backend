@@ -2,7 +2,7 @@ from sqlalchemy.orm import Session
 from typing import Optional, List, Set
 from app.shared.models import PeriodoAcademico, Auditoria
 from app.modules.estudiantes.models import Estudiante, EstudianteBanda
-from app.modules.rectoria.models import FirmasPazYSalvo
+from app.modules.paz_y_salvo.models import FirmasPazYSalvo
 from app.modules.uniformes.models import PrestamoObjeto
 from datetime import datetime
 from app.modules.paz_y_salvo.schemas import (

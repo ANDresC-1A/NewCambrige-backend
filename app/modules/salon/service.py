@@ -76,9 +76,18 @@ def get_all_pruebas(db: Session) -> list:
             "nombre": e.nombre if e else None,
             "grado": str(salon.grado) if salon else None,
             "grupo": str(salon.grupo) if salon else None,
-            "tipo_prueba": p.tipo_prueba.nombre if p.tipo_prueba else None,
+            "tipo_prueba": (
+                p.tipo_prueba.nombre
+                if p.tipo_prueba else None
+            ),
             "estado": p.estado,
-            "fecha_pago": p.updated_at.strftime("%d/%m/%Y") if p.updated_at else None,
+
+            # SOLO mostrar fecha si está pagado
+            "fecha_pago": (
+                p.fecha_pago.strftime("%d/%m/%Y")
+                if p.estado == "visto" and p.fecha_pago
+                else None
+            ),
         })
 
     return resultado
@@ -86,13 +95,20 @@ def get_all_pruebas(db: Session) -> list:
 
 def create_prueba(db: Session, data: dict) -> Prueba:
     nueva = Prueba(**data)
+
     db.add(nueva)
     db.commit()
     db.refresh(nueva)
+
     return nueva
 
 
-def update_estado_prueba(db: Session, prueba_id: int, estado: str) -> Optional[Prueba]:
+def update_estado_prueba(
+    db: Session,
+    prueba_id: int,
+    estado: str
+) -> Optional[Prueba]:
+
     prueba = db.query(Prueba).filter(
         Prueba.id_prueba == prueba_id
     ).first()
@@ -102,10 +118,14 @@ def update_estado_prueba(db: Session, prueba_id: int, estado: str) -> Optional[P
 
     prueba.estado = estado
 
+    # FECHA AUTOMÁTICA
+    if estado == "visto":
+        prueba.fecha_pago = date.today()
+
     db.commit()
     db.refresh(prueba)
-    return prueba
 
+    return prueba
 
 # ======================
 # 🪑 PUPITRES

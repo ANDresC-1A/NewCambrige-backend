@@ -12,14 +12,16 @@ class FirmasBase(BaseModel):
     tesoreria: bool = False
     uniforme: bool = False
     salon: bool = False
+    secretaria: bool = False
     rectoria: bool = False
+    
 
 class FirmasUpdate(BaseModel):
     banda: Optional[bool] = None
     tesoreria: Optional[bool] = None
     uniforme: Optional[bool] = None
     salon: Optional[bool] = None
-    rectoria: Optional[bool] = None
+    secretaria: Optional[bool] = None
 
 class FirmasResponse(FirmasBase):
     id_firma: int

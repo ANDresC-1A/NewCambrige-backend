@@ -48,14 +48,6 @@ def obtener_estado_paz_salvo(
         raise HTTPException(status_code=404, detail="Estudiante no encontrado")
     return resultado
 
-@router.get("/sin-firmar/periodo/{periodo_id}")
-def estudiantes_sin_firmas(
-    periodo_id: Optional[int] = None,
-    db: Session = Depends(get_db),
-    current_user = Depends(require_roles(["admin", "secretaria", "rectoria"]))
-):
-    return service.get_sin_firmas(db, periodo_id)
-
 @router.get("/firmas/{estudiante_id}", response_model=FirmasResponse)
 def obtener_firmas(
     estudiante_id: int,
@@ -71,11 +63,12 @@ def obtener_firmas(
         "id_firma": firmas.id_firma,
         "id_estudiante": firmas.id_estudiante,
         "id_periodo": firmas.id_periodo,
-        "banda": firmas.banda,
-        "tesoreria": firmas.tesoreria,
-        "uniforme": firmas.uniforme,
-        "rectoria": firmas.rectoria,
-        "salon": service._get_salon(firmas),
+        "banda": service._get_valor_campo(firmas, "banda"),
+        "tesoreria": service._get_valor_campo(firmas, "tesoreria"),
+        "uniforme": service._get_valor_campo(firmas, "uniforme"),
+        "rectoria": service._get_valor_campo(firmas, "rectoria"),
+        "secretaria": service._get_valor_campo(firmas, "secretaria"),
+        "salon": service._get_valor_campo(firmas, "salon"),
         "updated_at": firmas.updated_at,
     }
 
@@ -93,18 +86,22 @@ def actualizar_firmas(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="La firma de Rectoría debe hacerse desde POST /api/paz-salvo/rectoria/{estudiante_id}")
 
     periodo_id_validado = _validar_acceso_periodo(periodo_id, current_user, db)
-    firmas = service.update_firmas(db, estudiante_id, periodo_id_validado, data.model_dump(exclude_unset=True))
+    try:
+        firmas = service.update_firmas(db, estudiante_id, periodo_id_validado, data.model_dump(exclude_unset=True))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     if not firmas:
         raise HTTPException(status_code=404, detail="Estudiante o periodo no encontrado")
     return {
         "id_firma": firmas.id_firma,
         "id_estudiante": firmas.id_estudiante,
         "id_periodo": firmas.id_periodo,
-        "banda": firmas.banda,
-        "tesoreria": firmas.tesoreria,
-        "uniforme": firmas.uniforme,
-        "rectoria": firmas.rectoria,
-        "salon": service._get_salon(firmas),
+        "banda": service._get_valor_campo(firmas, "banda"),
+        "tesoreria": service._get_valor_campo(firmas, "tesoreria"),
+        "uniforme": service._get_valor_campo(firmas, "uniforme"),
+        "rectoria": service._get_valor_campo(firmas, "rectoria"),
+        "secretaria": service._get_valor_campo(firmas, "secretaria"),
+        "salon": service._get_valor_campo(firmas, "salon"),
         "updated_at": firmas.updated_at,
     }
 

@@ -135,7 +135,7 @@ def get_all_pupitres(db: Session) -> list:
             "estado": p.estado,
             "fecha_pago": (
                 p.fecha_pago.strftime("%d/%m/%Y")
-                if p.estado == "visto" and p.fecha_pago  # 👈 Cambio: "visto" en lugar de "PAGADO"
+                if p.estado == "Pagado" and p.fecha_pago  #  Cambio: "visto" en lugar de "PAGADO"
                 else None
             ),
         })
@@ -153,7 +153,7 @@ def update_pupitre(db: Session, pupitre_id: int, estado: str, fecha_pago: Option
 
     pupitre.estado = estado
     
-    if fecha_pago:  # 👈 Ahora recibe el parámetro
+    if fecha_pago:  # Ahora recibe el parámetro
         pupitre.fecha_pago = fecha_pago
 
     db.commit()

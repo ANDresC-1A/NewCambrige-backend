@@ -15,7 +15,7 @@ from app.modules.auth.deps import require_roles
 router = APIRouter()
 
 # ======================
-# 🏫 SALONES
+#  SALONES
 # ======================
 @router.get("/", response_model=List[SalonResponse])
 def listar_salones(
@@ -84,7 +84,7 @@ def actualizar_estado_prueba(
     return prueba
 
 # ======================
-# 🪑 PUPITRES
+#  PUPITRES
 # ======================
 @router.get("/pupitres", response_model=List[dict])
 def listar_pupitres(
@@ -103,7 +103,7 @@ def actualizar_pupitre(
     return pupitre
 
 # ======================
-# 📚 BIBLIOTECA
+#  BIBLIOTECA
 # ======================
 @router.get("/libros", response_model=List[LibroResponse])
 def listar_libros(

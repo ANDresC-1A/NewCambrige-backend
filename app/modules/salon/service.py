@@ -12,6 +12,10 @@ from app.modules.estudiantes.models import Estudiante
 def get_all(db: Session, skip: int = 0, limit: int = 100) -> List[Salon]:
     return db.query(Salon).offset(skip).limit(limit).all()
 
+def get_salon_all_by_periodo(db: Session, id_periodo: int, skip: int = 0, limit: int = 100) -> List[Salon]:
+    return db.query(Salon).filter(Salon.id_periodo == id_periodo).offset(skip).limit(limit).all()
+
+
 def get_by_id(db: Session, salon_id: int) -> Optional[Salon]:
     return db.query(Salon).filter(Salon.id_salon == salon_id).first()
 

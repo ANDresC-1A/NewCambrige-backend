@@ -3,9 +3,20 @@ from typing import Optional, List
 
 from app.modules.estudiantes.models import Estudiante
 from app.modules.estudiantes.schemas import EstudianteCreate, EstudianteUpdate
+from app.modules.salon.models import Salon
 
 def get_all(db: Session, skip: int = 0, limit: int = 100) -> List[Estudiante]:
     return db.query(Estudiante).offset(skip).limit(limit).all()
+
+def get_by_periodo(db: Session, id_periodo: int, skip: int = 0, limit: int = 100) -> List[Estudiante]:
+    return (
+        db.query(Estudiante)
+        .join(Salon, Estudiante.id_salon == Salon.id_salon) 
+        .filter(Salon.id_periodo == id_periodo)             
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
 
 def get_by_id(db: Session, estudiante_id: int) -> Optional[Estudiante]:
     return db.query(Estudiante).filter(Estudiante.id_estudiante == estudiante_id).first()

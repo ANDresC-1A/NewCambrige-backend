@@ -6,7 +6,7 @@ from app.core.database import get_db
 from app.core.security import verificar_token
 from app.modules.auth.models import SesionUsuario
 from app.modules.usuarios.models import Usuario, RolUsuario, Rol
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/token", auto_error=True)
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/token", auto_error=False)#desarrollo
 
 def get_current_user(
     token: str = Depends(oauth2_scheme),

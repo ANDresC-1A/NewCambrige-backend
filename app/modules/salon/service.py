@@ -261,6 +261,7 @@ def update_libro(db: Session, libro_id: int, data: dict) -> Optional[InventarioL
 
 
 def delete_libro(db: Session, libro_id: int) -> bool:
+    # 1. Buscar el libro en el inventario por su ID
     libro = db.query(InventarioLibro).filter(
         InventarioLibro.id_libro == libro_id
     ).first()
@@ -268,14 +269,82 @@ def delete_libro(db: Session, libro_id: int) -> bool:
     if not libro:
         return False
 
-    db.delete(libro)
+    # 2. Guardar el nombre exacto del libro
+    nombre_libro_original = libro.nombre
+
+    try:
+        # 3. Filtrado directo en la DB usando igualdad estándar (sin .ilike ni .all() masivo)
+        # Esto evita procesar registros corruptos de otros libros
+        prestamos_asociados = db.query(PrestamoLibro).filter(
+            PrestamoLibro.libro == nombre_libro_original
+        ).all()
+
+        # 4. Actualizar el log de auditoría para este libro
+        for prestamo in prestamos_asociados:
+            prestamo.observacion = "Libro eliminado del inventario"
+            prestamo.estado = True  # Cerrar préstamo en el historial
+
+    except Exception as current_error:
+        # Si la tabla de préstamos tiene un problema estructural, imprimimos el error real en la consola de Python
+        print(f"--- ERROR CRÍTICO EN AUDITORÍA DE PRÉSTAMOS: {str(current_error)} ---")
+        # No detenemos el flujo para que al menos el borrado lógico del libro se ejecute
+        pass
+
+    # 5. Aplicar Borrado Lógico en el libro
+    libro.disponible = False
+    
+    if "Eliminado del Inventario" not in libro.nombre:
+        libro.nombre = f"{libro.nombre} (Eliminado del Inventario)"
+
+    # 6. Confirmar cambios de forma limpia
     db.commit()
     return True
 
-
 def create_prestamo(db: Session, data: dict) -> PrestamoLibro:
+    # 1. Crear el registro del préstamo
     prestamo = PrestamoLibro(**data)
     db.add(prestamo)
+    
+    # 2. LÓGICA AUTOMÁTICA: Buscar el libro por su nombre (o ID si lo cambias luego) y pasarlo a NO disponible
+    libro = db.query(InventarioLibro).filter(
+        # Usamos ilike para evitar problemas de mayúsculas/minúsculas con el string enviado por el front
+        InventarioLibro.nombre.ilike(data.get("libro")) 
+    ).first()
+    
+    if libro:
+        libro.disponible = False
+        # Si del front mandas un estado físico al asignar, lo actualizamos aquí
+        if "estado_fisico" in data: 
+            libro.estado_fisico = data.get("estado_fisico")
+
+    db.commit()
+    db.refresh(prestamo)
+    return prestamo
+
+
+def registrar_devolucion(db: Session, prestamo_id: int, data: dict) -> Optional[PrestamoLibro]:
+    """
+    Función que te faltaba para procesar la devolución en el backend.
+    """
+    # 1. Buscar el préstamo activo
+    prestamo = db.query(PrestamoLibro).filter(PrestamoLibro.id_prestamo == prestamo_id).first()
+    if not prestamo:
+        return None
+        
+    # 2. Actualizar el estado del préstamo a Devuelto (True) y meter observaciones
+    prestamo.estado = True 
+    if "observacion" in data:
+        prestamo.observacion = data.get("observacion")
+    if "fecha_devolucion" in data:
+        prestamo.fecha_devolucion = data.get("fecha_devolucion")
+
+    # 3. LÓGICA AUTOMÁTICA: Volver a poner el libro como Disponible
+    libro = db.query(InventarioLibro).filter(InventarioLibro.nombre.ilike(prestamo.libro)).first()
+    if libro:
+        libro.disponible = True
+        if "estado_de_devolucion" in data:
+            libro.estado_fisico = data.get("estado_de_devolucion")
+
     db.commit()
     db.refresh(prestamo)
     return prestamo

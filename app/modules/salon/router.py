@@ -37,16 +37,16 @@ def listar_salones_por_periodo(
     return service.get_salon_all_by_periodo(db, id_periodo,skip, limit)
 
 
-@router.get("/{salon_id}", response_model=SalonResponse)
-def obtener_salon(
-    salon_id: int,
-    db: Session = Depends(get_db),
-    current_user = Depends(require_roles(["admin", "titular", "secretaria"]))
-):
-    salon = service.get_by_id(db, salon_id)
-    if not salon:
-        raise HTTPException(status_code=404, detail="Salón no encontrado")
-    return salon
+#@router.get("/{salon_id}", response_model=SalonResponse)
+#def obtener_salon(
+ #   salon_id: int,
+  #  db: Session = Depends(get_db),
+   # current_user = Depends(require_roles(["admin", "titular", "secretaria"]))
+#):
+ #   salon = service.get_by_id(db, salon_id)
+  #  if not salon:
+   #     raise HTTPException(status_code=404, detail="Salón no encontrado")
+    #return salon
 
 @router.get("/grado/{grado}/grupo/{grupo}", response_model=List[SalonResponse])
 def salones_por_grado_grupo(
@@ -171,6 +171,17 @@ def crear_prestamo(
     db: Session = Depends(get_db),
 ):
     return service.create_prestamo(db, data.model_dump())
+
+@router.put("/prestamos/{prestamo_id}/devolver", response_model=PrestamoResponse)
+def devolver_libro_prestado(
+    prestamo_id: int,
+    data: dict, # Puedes crear un schema Pydantic PrestamoDevolver si lo prefieres
+    db: Session = Depends(get_db),
+):
+    prestamo = service.registrar_devolucion(db, prestamo_id, data)
+    if not prestamo:
+        raise HTTPException(status_code=404, detail="Registro de préstamo no encontrado")
+    return prestamo
 
 # ← GET /{salon_id} VA AL FINAL
 @router.get("/{salon_id}", response_model=SalonResponse)

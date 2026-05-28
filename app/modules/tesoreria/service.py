@@ -2,7 +2,7 @@ from app.modules.tesoreria.models import Matricula
 from sqlalchemy.orm import Session
 from typing import Optional, List
 from app.modules.estudiantes.models import Estudiante
-from app.modules.rectoria.models import FirmasPazYSalvo
+from app.modules.paz_y_salvo.models import FirmasPazYSalvo
 from app.shared.models import PeriodoAcademico
 
 def registrar_pago(db: Session, estudiante_id: int, periodo_id: Optional[int] = None) -> Optional[dict]:

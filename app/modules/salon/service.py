@@ -222,6 +222,7 @@ def get_all_prestamos(db: Session) -> list:
         salon = e.salon if e else None
 
         resultado.append({
+            "id_prestamo": p.id_prestamo,
             "codigo": e.documento if e else None,
             "nombre": e.nombre if e else None,
             "grado": str(salon.grado) if salon else None,
@@ -261,7 +262,7 @@ def update_libro(db: Session, libro_id: int, data: dict) -> Optional[InventarioL
 
 
 def delete_libro(db: Session, libro_id: int) -> bool:
-    # 1. Buscar el libro en el inventario por su ID
+
     libro = db.query(InventarioLibro).filter(
         InventarioLibro.id_libro == libro_id
     ).first()
@@ -269,82 +270,132 @@ def delete_libro(db: Session, libro_id: int) -> bool:
     if not libro:
         return False
 
-    # 2. Guardar el nombre exacto del libro
-    nombre_libro_original = libro.nombre
+    # VALIDAR SI ESTÁ PRESTADO
+    if libro.disponible == False:
+        raise Exception(
+            "No es posible eliminar un libro con préstamo activo."
+        )
 
-    try:
-        # 3. Filtrado directo en la DB usando igualdad estándar (sin .ilike ni .all() masivo)
-        # Esto evita procesar registros corruptos de otros libros
-        prestamos_asociados = db.query(PrestamoLibro).filter(
-            PrestamoLibro.libro == nombre_libro_original
-        ).all()
+    # BORRADO LÓGICO
+    if "(Eliminado del Inventario)" not in libro.nombre:
+        libro.nombre = (
+            f"{libro.nombre} (Eliminado del Inventario)"
+        )
 
-        # 4. Actualizar el log de auditoría para este libro
-        for prestamo in prestamos_asociados:
-            prestamo.observacion = "Libro eliminado del inventario"
-            prestamo.estado = True  # Cerrar préstamo en el historial
-
-    except Exception as current_error:
-        # Si la tabla de préstamos tiene un problema estructural, imprimimos el error real en la consola de Python
-        print(f"--- ERROR CRÍTICO EN AUDITORÍA DE PRÉSTAMOS: {str(current_error)} ---")
-        # No detenemos el flujo para que al menos el borrado lógico del libro se ejecute
-        pass
-
-    # 5. Aplicar Borrado Lógico en el libro
-    libro.disponible = False
-    
-    if "Eliminado del Inventario" not in libro.nombre:
-        libro.nombre = f"{libro.nombre} (Eliminado del Inventario)"
-
-    # 6. Confirmar cambios de forma limpia
     db.commit()
+
     return True
 
-def create_prestamo(db: Session, data: dict) -> PrestamoLibro:
-    # 1. Crear el registro del préstamo
-    prestamo = PrestamoLibro(**data)
-    db.add(prestamo)
-    
-    # 2. LÓGICA AUTOMÁTICA: Buscar el libro por su nombre (o ID si lo cambias luego) y pasarlo a NO disponible
-    libro = db.query(InventarioLibro).filter(
-        # Usamos ilike para evitar problemas de mayúsculas/minúsculas con el string enviado por el front
-        InventarioLibro.nombre.ilike(data.get("libro")) 
+def create_prestamo(db: Session, data: dict) -> dict:
+    # 1. Buscar estudiante por código
+    estudiante = db.query(Estudiante).filter(
+        Estudiante.documento == str(data.get("codigo"))
     ).first()
-    
-    if libro:
-        libro.disponible = False
-        # Si del front mandas un estado físico al asignar, lo actualizamos aquí
-        if "estado_fisico" in data: 
-            libro.estado_fisico = data.get("estado_fisico")
+    if not estudiante:
+        raise Exception(f"Estudiante con código {data.get('codigo')} no encontrado.")
 
+    # 2. Buscar libro por nombre
+    libro = db.query(InventarioLibro).filter(
+        InventarioLibro.nombre.ilike(data.get("libro"))
+    ).first()
+    if not libro:
+        raise Exception(f"Libro '{data.get('libro')}' no encontrado en inventario.")
+    if not libro.disponible:
+        raise Exception(f"El libro '{libro.nombre}' no está disponible.")
+
+    # ✅ VALIDACIÓN 1: libro en mal estado no se puede prestar
+    if libro.estado_fisico == "Malo":
+        raise Exception(f"El libro '{libro.nombre}' está en mal estado y no puede prestarse hasta ser revisado.")
+
+    # ✅ VALIDACIÓN 2: límite de 3 libros prestados por estudiante
+    prestamos_activos = db.query(PrestamoLibro).filter(
+        PrestamoLibro.id_estudiante == estudiante.id_estudiante,
+        PrestamoLibro.estado == "Prestado"
+    ).count()
+    if prestamos_activos >= 3:
+        raise Exception(f"El estudiante ya tiene 3 libros prestados. Debe devolver uno antes de solicitar otro.")
+
+    # 3. Actualizar libro
+    libro.disponible    = False
+    libro.estado_fisico = data.get("estado_fisico", "Excelente")
+
+    # 4. Crear el préstamo
+    prestamo = PrestamoLibro(
+        id_estudiante    = estudiante.id_estudiante,
+        id_libro         = libro.id_libro,
+        fecha_prestamo   = date.today(),
+        fecha_devolucion = data.get("fecha_devolucion"),
+        estado           = "Prestado",
+    )
+    db.add(prestamo)
     db.commit()
-    db.refresh(prestamo)
-    return prestamo
 
+    # 5. Re-query con relaciones
+    prestamo = db.query(PrestamoLibro).options(
+        joinedload(PrestamoLibro.estudiante).joinedload(Estudiante.salon),
+        joinedload(PrestamoLibro.libro)
+    ).filter(PrestamoLibro.id_prestamo == prestamo.id_prestamo).first()
 
-def registrar_devolucion(db: Session, prestamo_id: int, data: dict) -> Optional[PrestamoLibro]:
-    """
-    Función que te faltaba para procesar la devolución en el backend.
-    """
-    # 1. Buscar el préstamo activo
-    prestamo = db.query(PrestamoLibro).filter(PrestamoLibro.id_prestamo == prestamo_id).first()
+    e     = prestamo.estudiante
+    salon = e.salon if e else None
+    return {
+        "id_prestamo":      prestamo.id_prestamo,
+        "codigo":           e.documento if e else None,
+        "nombre":           e.nombre if e else None,
+        "grado":            str(salon.grado) if salon else None,
+        "grupo":            str(salon.grupo) if salon else None,
+        "libro":            prestamo.libro.nombre if prestamo.libro else None,
+        "fecha_prestamo":   str(prestamo.fecha_prestamo) if prestamo.fecha_prestamo else None,
+        "fecha_devolucion": str(prestamo.fecha_devolucion) if prestamo.fecha_devolucion else None,
+        "estado":           prestamo.estado,
+    }
+
+def registrar_devolucion(db: Session, prestamo_id: int, data: dict) -> Optional[dict]:
+    prestamo = db.query(PrestamoLibro).filter(
+        PrestamoLibro.id_prestamo == prestamo_id
+    ).first()
     if not prestamo:
         return None
-        
-    # 2. Actualizar el estado del préstamo a Devuelto (True) y meter observaciones
-    prestamo.estado = True 
-    if "observacion" in data:
-        prestamo.observacion = data.get("observacion")
-    if "fecha_devolucion" in data:
-        prestamo.fecha_devolucion = data.get("fecha_devolucion")
 
-    # 3. LÓGICA AUTOMÁTICA: Volver a poner el libro como Disponible
-    libro = db.query(InventarioLibro).filter(InventarioLibro.nombre.ilike(prestamo.libro)).first()
+    prestamo.estado = "Devuelto"
+
+    fecha = data.get("fecha_devolucion")
+    if isinstance(fecha, date):
+        prestamo.fecha_devolucion = fecha
+    elif isinstance(fecha, str) and fecha:
+        prestamo.fecha_devolucion = date.fromisoformat(fecha)
+    else:
+        prestamo.fecha_devolucion = date.today()
+
+    if data.get("observacion"):
+        prestamo.observacion = data["observacion"]
+
+    libro = db.query(InventarioLibro).filter(
+        InventarioLibro.id_libro == prestamo.id_libro
+    ).first()
     if libro:
         libro.disponible = True
-        if "estado_de_devolucion" in data:
-            libro.estado_fisico = data.get("estado_de_devolucion")
+        if data.get("estado_de_devolucion"):
+            libro.estado_fisico = data["estado_de_devolucion"]
 
     db.commit()
-    db.refresh(prestamo)
-    return prestamo
+
+    # Re-query con relaciones cargadas, igual que get_all_prestamos
+    prestamo = db.query(PrestamoLibro).options(
+        joinedload(PrestamoLibro.estudiante).joinedload(Estudiante.salon),
+        joinedload(PrestamoLibro.libro)
+    ).filter(PrestamoLibro.id_prestamo == prestamo_id).first()
+
+    e = prestamo.estudiante
+    salon = e.salon if e else None
+    return {
+        "id_prestamo":      prestamo.id_prestamo,
+        "codigo":           e.documento if e else None,
+        "nombre":           e.nombre if e else None,
+        "grado":            str(salon.grado) if salon else None,
+        "grupo":            str(salon.grupo) if salon else None,
+        "libro":            prestamo.libro.nombre if prestamo.libro else None,
+        "fecha_prestamo":   str(prestamo.fecha_prestamo) if prestamo.fecha_prestamo else None,
+        "fecha_devolucion": str(prestamo.fecha_devolucion) if prestamo.fecha_devolucion else None,
+        "estado":           prestamo.estado,
+    }

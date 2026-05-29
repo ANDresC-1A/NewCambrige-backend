@@ -4,7 +4,7 @@ from typing import List
 from app.core.database import get_db
 from app.modules.salon import service
 from app.modules.salon.schemas import (
-    SalonResponse, SalonCreate, SalonUpdate,
+    DevolucionSchema, SalonResponse, SalonCreate, SalonUpdate,
     PruebaResponse, PruebaCreate,
     PupitreResponse, PupitreUpdate,
     LibroResponse, LibroCreate, LibroUpdate,
@@ -170,15 +170,18 @@ def crear_prestamo(
     data: PrestamoCreate,
     db: Session = Depends(get_db),
 ):
-    return service.create_prestamo(db, data.model_dump())
+    try:
+        return service.create_prestamo(db, data.model_dump())
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 @router.put("/prestamos/{prestamo_id}/devolver", response_model=PrestamoResponse)
 def devolver_libro_prestado(
     prestamo_id: int,
-    data: dict, # Puedes crear un schema Pydantic PrestamoDevolver si lo prefieres
+    data: DevolucionSchema, # Puedes crear un schema Pydantic PrestamoDevolver si lo prefieres
     db: Session = Depends(get_db),
 ):
-    prestamo = service.registrar_devolucion(db, prestamo_id, data)
+    prestamo = service.registrar_devolucion(db, prestamo_id, data.model_dump())
     if not prestamo:
         raise HTTPException(status_code=404, detail="Registro de préstamo no encontrado")
     return prestamo

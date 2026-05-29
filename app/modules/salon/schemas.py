@@ -97,11 +97,14 @@ class LibroCreate(BaseModel):
 class LibroUpdate(BaseModel):
     nombre: Optional[str] = None
     autor: Optional[str] = None
+    edicion:      Optional[str]  = None   # 
+    estado_fisico: Optional[str] = None   # 
     id_salon: Optional[int] = None
     disponible: Optional[bool] = None
 
 
 class PrestamoResponse(BaseModel):
+    id_prestamo: Optional[int] = None
     codigo: Optional[str] = None
     nombre: Optional[str] = None
     grado: Optional[str] = None
@@ -113,8 +116,13 @@ class PrestamoResponse(BaseModel):
 
 
 class PrestamoCreate(BaseModel):
-    id_libro: int
-    id_estudiante: int
-    fecha_prestamo: Optional[date] = None
+    codigo:           int
+    libro:            str
     fecha_devolucion: Optional[date] = None
-    estado: Optional[str] = "Pendiente"   #CAMBIO AQUI
+    estado:           Optional[str]  = "Prestado"
+    estado_fisico:    Optional[str]  = "Excelente"
+
+class DevolucionSchema(BaseModel):
+    fecha_devolucion: Optional[date] = None
+    estado_de_devolucion: Optional[str] = None
+    observacion: Optional[str] = None

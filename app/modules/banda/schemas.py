@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, List
 from datetime import date, datetime
 
@@ -36,11 +36,13 @@ class UbicacionResponse(UbicacionBase):
 
 # ============ INSTRUMENTOS ============
 class InstrumentoBase(BaseModel):
+    codigo:int
     nombre: str
     id_categoria: Optional[int] = None
     id_ubicacion: Optional[int] = None
-    disponible: bool = True
-
+    cantidad_total:int = Field(ge=1)
+    estado:str = "activo"
+    
 class InstrumentoCreate(InstrumentoBase):
     pass
 
@@ -48,21 +50,27 @@ class InstrumentoUpdate(BaseModel):
     nombre: Optional[str] = None
     id_categoria: Optional[int] = None
     id_ubicacion: Optional[int] = None
-    disponible: Optional[bool] = None
+    cantidad_total: Optional[int] = Field(None, ge=1)
+    estado: Optional[str] = None
 
 class InstrumentoResponse(InstrumentoBase):
     id_instrumento: int
+    cantidad_disponible: int
     categoria_nombre: Optional[str] = None
     ubicacion_nombre: Optional[str] = None
     
     class Config:
         from_attributes = True
 
+# ============ DEVOLUCIONES DE INSTRUMENTOS ============
+class DevolucionCreate(BaseModel):
+    estado_al_devolver: str # "Bueno" o "Malo"
+    observaciones: Optional[str] = None
+
 # ============ PRÉSTAMOS DE INSTRUMENTOS ============
 class PrestamoInstrumentoBase(BaseModel):
     id_instrumento: int
     id_estudiante: int
-    fecha_prestamo: date
     observacion: Optional[str] = None
 
 class PrestamoInstrumentoCreate(PrestamoInstrumentoBase):
@@ -75,8 +83,13 @@ class PrestamoInstrumentoUpdate(BaseModel):
 
 class PrestamoInstrumentoResponse(PrestamoInstrumentoBase):
     id_prestamo: int
+    id_instrumento: int
+    id_estudiante: int
+    fecha_prestamo: date
     fecha_devolucion: Optional[date] = None
     estado_entrega: str
+    estado_al_devolver: Optional[str] = None
+    observacion: Optional[str] = None
     created_at: datetime
     updated_at: datetime
     instrumento_nombre: Optional[str] = None
@@ -88,7 +101,9 @@ class PrestamoInstrumentoResponse(PrestamoInstrumentoBase):
 # ============ REPORTES ============
 class InstrumentoDisponibleResponse(BaseModel):
     id_instrumento: int
+    codigo: int
     nombre: str
+    cantidad_disponible: int
     categoria: Optional[str] = None
     ubicacion: Optional[str] = None
 
@@ -96,5 +111,5 @@ class PrestamoActivoResponse(BaseModel):
     id_prestamo: int
     instrumento: str
     estudiante: str
-    fecha_prestamo: date
+    fecha_prestamo: datetime
     dias_prestado: int

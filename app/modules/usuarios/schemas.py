@@ -10,6 +10,7 @@ class UsuarioCreate(UsuarioBase):
     password: str
     roles: Optional[List[str]] = None
     estado: Optional[bool] = True
+    documento: Optional[str] = None    
 
 class UsuarioUpdate(BaseModel):
     nombre: Optional[str] = None
@@ -19,6 +20,7 @@ class UsuarioUpdate(BaseModel):
 class UsuarioResponse(UsuarioBase):
     id_usuario: int
     estado: bool
+    documento: Optional[str] = None
     created_at: Optional[datetime] = None
     roles: List[str] = []
     

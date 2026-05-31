@@ -7,6 +7,7 @@ from app.modules.paz_y_salvo import service
 from app.modules.paz_y_salvo.schemas import FirmasResponse, FirmasUpdate, EstadoPazSalvoResponse, RectoriaFirmaRequest, RectoriaFirmaResponse, EstudiantePendienteResponse
 from app.modules.auth.deps import require_roles
 from app.modules.usuarios.models import Usuario, RolUsuario, Rol
+from fastapi.responses import FileResponse
 
 router = APIRouter()
 
@@ -87,7 +88,7 @@ def actualizar_firmas(
 
     periodo_id_validado = _validar_acceso_periodo(periodo_id, current_user, db)
     try:
-        firmas = service.update_firmas(db, estudiante_id, periodo_id_validado, data.model_dump(exclude_unset=True))
+        firmas = service.update_firmas(db, estudiante_id, periodo_id_validado, data.model_dump(exclude_unset=True), current_user.id_usuario)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     if not firmas:
@@ -118,6 +119,7 @@ def firmar_rectoria(
         db=db,
         estudiante_id=estudiante_id,
         usuario_nombre=current_user.nombre,
+        usuario_id=current_user.id_usuario,
         periodo_id=periodo_id_validado,
     )
 
@@ -163,3 +165,17 @@ def listar_pendientes(
     current_user: Usuario = Depends(require_roles(["admin", "secretaria", "rectoria"])),
 ):
     return service.get_pendientes(db, periodo_id)
+
+@router.get("/sello")
+def obtener_sello(
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_roles(["admin", "secretaria", "tesoreria", "uniformes", "banda", "titular", "rectoria"]))
+):
+    resultado = service.obtener_sello()
+    if "error" in resultado:
+        raise HTTPException(404, resultado["error"])
+    return FileResponse(resultado["ruta"], media_type="image/svg+xml", headers={"X-Hash-SHA256": resultado["hash"]})
+
+@router.get("/sello/hash")
+def verificar_hash_sello():
+    return service.verificar_sello()

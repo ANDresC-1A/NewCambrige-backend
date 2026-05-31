@@ -1,15 +1,15 @@
 from sqlalchemy.orm import Session, joinedload
-from typing import Optional, List, Set
+from typing import Optional, List
 from app.shared.models import PeriodoAcademico, Auditoria
 from app.modules.estudiantes.models import Estudiante, EstudianteBanda
 from app.modules.paz_y_salvo.models import FirmasPazYSalvo, TipoFirma, DetalleFirmaPazYSalvo
 from app.modules.uniformes.models import PrestamoObjeto
+from app.modules.paz_y_salvo.schemas import SemaforoEstado, DetalleFirma, EstudiantePendienteResponse
 from datetime import datetime
-from app.modules.paz_y_salvo.schemas import (
-    SemaforoEstado,
-    DetalleFirma,
-    EstudiantePendienteResponse
-)
+import hashlib, os
+
+SELLO_PATH = "app/modules/paz_y_salvo/sellos/sello.svg"
+SELLO_HASH_PATH = "app/modules/paz_y_salvo/sellos/sello.svg.hash"
 
 CAMPOS_FIRMAS = ["banda", "tesoreria", "uniforme", "salon", "secretaria", "rectoria"]
 
@@ -48,6 +48,29 @@ def _get_valor_campo(firma, campo):
         return False
     d = _get_detalle(firma, tipo_nombre)
     return d.estado if d else False
+
+def _hash_sello() -> str:
+    if os.path.exists(SELLO_PATH):
+        with open(SELLO_PATH, "rb") as f:
+            return hashlib.sha256(f.read()).hexdigest()
+    return ""
+
+def _hash_guardado() -> str:
+    if os.path.exists(SELLO_HASH_PATH):
+        with open(SELLO_HASH_PATH, "r", encoding="utf-8-sig") as f:
+            contenido = f.read().strip()
+            return "".join(c for c in contenido if c in "0123456789abcdef")
+    return ""
+
+def verificar_sello() -> dict:
+    actual = _hash_sello()
+    guardado = _hash_guardado()
+    return {
+        "hash_actual": actual,
+        "hash_guardado": guardado if guardado else None,
+        "integro": actual == guardado if guardado else False,
+        "archivo": "sello.svg",
+    }
 
 def _get_no_aplica(db: Session, estudiante_id: int) -> set:
     no_aplica = set()
@@ -188,7 +211,7 @@ def get_estado_completo(db: Session, estudiante_id: int, periodo_id: Optional[in
         "total_firmas":      len([c for c in CAMPOS_FIRMAS if c not in no_aplica]),
     }
 
-def update_firmas(db: Session, estudiante_id: int, periodo_id: Optional[int], data: dict) -> Optional[FirmasPazYSalvo]:
+def update_firmas(db: Session, estudiante_id: int, periodo_id: Optional[int], data: dict, usuario_id: int = None) -> Optional[FirmasPazYSalvo]:
     if not periodo_id:
         periodo = _get_periodo_activo(db)
         if not periodo:
@@ -207,6 +230,8 @@ def update_firmas(db: Session, estudiante_id: int, periodo_id: Optional[int], da
             d = _get_detalle(firmas, CAMPO_TIPO_MAP.get(key))
             if d:
                 d.estado = value
+                if usuario_id:
+                    d.id_usuario_firmante = usuario_id
     
     db.commit()
     db.refresh(firmas)
@@ -214,7 +239,7 @@ def update_firmas(db: Session, estudiante_id: int, periodo_id: Optional[int], da
 
 
 
-def firmar_rectoria(db: Session, estudiante_id: int, usuario_nombre: str, periodo_id: Optional[int] = None) -> dict:
+def firmar_rectoria(db: Session, estudiante_id: int, usuario_nombre: str, periodo_id: Optional[int] = None, usuario_id: int = None) -> dict:
     estudiante = db.query(Estudiante).filter(Estudiante.id_estudiante == estudiante_id).first()
     if not estudiante:
         return {"error": "Estudiante no encontrado", "codigo": 404}
@@ -250,6 +275,8 @@ def firmar_rectoria(db: Session, estudiante_id: int, usuario_nombre: str, period
     if d_rect.estado:
         return {"error": "Este estudiante ya tiene la firma de Rectoría.", "codigo": 400}
     d_rect.estado = True
+    if usuario_id:
+        d_rect.id_usuario_firmante = usuario_id
 
     _registrar_auditoria(
         db=db,
@@ -298,3 +325,8 @@ def get_pendientes(db: Session, periodo_id: Optional[int] = None) -> List[dict]:
             ))
 
     return resultado
+
+def obtener_sello() -> dict:
+    if not os.path.exists(SELLO_PATH):
+        return {"error": "Sello no encontrado"}
+    return {"ruta": SELLO_PATH, "hash": _hash_sello()}

@@ -22,6 +22,7 @@ class FirmasUpdate(BaseModel):
     uniforme: Optional[bool] = None
     salon: Optional[bool] = None
     secretaria: Optional[bool] = None
+    rectoria: Optional[bool] = None
 
 class FirmasResponse(FirmasBase):
     id_firma: int
@@ -69,3 +70,13 @@ class EstudiantePendienteResponse(BaseModel):
 
 class RectoriaFirmaRequest(BaseModel):
     observacion: Optional[str] = None
+
+class SelloHashResponse(BaseModel):
+    hash_actual: str
+    hash_registrado: Optional[str] = None
+    integro: bool
+    ultima_actualizacion: Optional[datetime] = None
+
+class SelloRegistroResponse(BaseModel):
+    mensaje: str
+    hash_sha256: str

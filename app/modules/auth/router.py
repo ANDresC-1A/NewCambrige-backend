@@ -58,6 +58,7 @@ def register(data: UsuarioCreate, db: Session = Depends(get_db)):
     usuario = service.crear_usuario(
         db,
         data.nombre,
+        data.documento,
         data.password,
         data.roles if hasattr(data, "roles") else None
     )

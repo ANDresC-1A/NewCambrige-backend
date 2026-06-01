@@ -39,6 +39,7 @@ def get_usuario_con_roles(db: Session, usuario_id: int) -> Optional[dict]:
 def create_usuario(db: Session, data: dict) -> Usuario:
     nuevo = Usuario(
         nombre=data["nombre"],
+        documento=data["documento"],
         contrasena=hash_password(data["password"]),
         estado=data.get("estado", True)
     )

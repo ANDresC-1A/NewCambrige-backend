@@ -71,12 +71,19 @@ class EstudiantePendienteResponse(BaseModel):
 class RectoriaFirmaRequest(BaseModel):
     observacion: Optional[str] = None
 
-class SelloHashResponse(BaseModel):
-    hash_actual: str
-    hash_registrado: Optional[str] = None
-    integro: bool
-    ultima_actualizacion: Optional[datetime] = None
+class TitularEstudianteResponse(BaseModel):
+    id_estudiante: int
+    nombre: str
+    semaforo: str
+    salon_firmado: bool
+    firmas_completadas: int
+    total_firmas: int
+    firmas_faltantes: list[str]
 
-class SelloRegistroResponse(BaseModel):
-    mensaje: str
-    hash_sha256: str
+class TitularPendientesResponse(BaseModel):
+    id_salon: int
+    grado: int
+    grupo: int
+    total_estudiantes: int
+    pendientes_salon: int
+    estudiantes: list[TitularEstudianteResponse]

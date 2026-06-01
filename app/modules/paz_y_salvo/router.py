@@ -166,6 +166,17 @@ def listar_pendientes(
 ):
     return service.get_pendientes(db, periodo_id)
 
+@router.get("/titular/pendientes")
+def titular_pendientes(
+    periodo_id: Optional[int] = Query(None),
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_roles(["titular", "admin"]))
+):
+    resultado = service.get_titular_pendientes(db, current_user.id_usuario, periodo_id)
+    if "error" in resultado:
+        raise HTTPException(resultado["codigo"], resultado["error"])
+    return resultado
+
 @router.get("/sello")
 def obtener_sello(
     db: Session = Depends(get_db),

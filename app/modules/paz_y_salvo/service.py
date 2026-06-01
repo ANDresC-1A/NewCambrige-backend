@@ -5,6 +5,9 @@ from app.modules.estudiantes.models import Estudiante, EstudianteBanda
 from app.modules.paz_y_salvo.models import FirmasPazYSalvo, TipoFirma, DetalleFirmaPazYSalvo
 from app.modules.uniformes.models import PrestamoObjeto
 from app.modules.paz_y_salvo.schemas import SemaforoEstado, DetalleFirma, EstudiantePendienteResponse
+from app.modules.salon.models import Salon, Prueba, Pupitre, PrestamoLibro
+from app.modules.banda.models import PrestamoInstrumento
+from app.modules.tesoreria.models import Matricula, DetalleMatricula
 from datetime import datetime
 import hashlib, os
 
@@ -82,20 +85,13 @@ def _get_no_aplica(db: Session, estudiante_id: int) -> set:
     if not en_banda:
         no_aplica.add("banda")
     
-    tiene_prestamo = db.query(PrestamoObjeto).filter(
-        PrestamoObjeto.id_estudiante == estudiante_id,
-        PrestamoObjeto.estado_entrega == "prestado"
-    ).first()
-    if not tiene_prestamo:
-        no_aplica.add("uniforme")
-    
     return no_aplica
 
-def _calcular_semaforo(firmas: FirmasPazYSalvo, no_aplica: set) -> str:
+def _calcular_semaforo(firmas_dict: dict, no_aplica: set) -> str:
     campos_que_aplican = [c for c in CAMPOS_FIRMAS if c not in no_aplica]
     if not campos_que_aplican:
         return SemaforoEstado.VERDE
-    valores = [_get_valor_campo(firmas, c) for c in campos_que_aplican]
+    valores = [firmas_dict[c] for c in campos_que_aplican]
     total_true = sum(v for v in valores if v)
     if total_true == len(campos_que_aplican):
         return SemaforoEstado.VERDE
@@ -104,11 +100,11 @@ def _calcular_semaforo(firmas: FirmasPazYSalvo, no_aplica: set) -> str:
     else:
         return SemaforoEstado.ROJO
 
-def _construir_detalle_firmas(firmas: FirmasPazYSalvo, no_aplica: set) -> list:
+def _construir_detalle_firmas(firmas_dict: dict, no_aplica: set) -> list:
     return [
         DetalleFirma(
             nombre=config["nombre"],
-            firmado= config["campo"] in no_aplica or _get_valor_campo(firmas, config["campo"]),
+            firmado= config["campo"] in no_aplica or firmas_dict.get(config["campo"], False),
             rol_responsable=config["rol"],
             no_aplica=config["campo"] in no_aplica,
         )
@@ -184,16 +180,11 @@ def get_estado_completo(db: Session, estudiante_id: int, periodo_id: Optional[in
     no_aplica = _get_no_aplica(db, estudiante_id)
     
     firmas_dict = {
-        "banda": True if "banda" in no_aplica else _get_valor_campo(firmas, "banda"),
-        "tesoreria": _get_valor_campo(firmas, "tesoreria"),
-        "uniforme": True if "uniforme" in no_aplica else _get_valor_campo(firmas, "uniforme"),
-        "salon": _get_valor_campo(firmas, "salon"),
-        "secretaria": _get_valor_campo(firmas, "secretaria"),
-        "rectoria": _get_valor_campo(firmas, "rectoria")
+        c: _get_valor_auto(firmas, c, db, estudiante_id, periodo_id) for c in CAMPOS_FIRMAS
     }
     
     campos_que_aplican = [c for c in CAMPOS_FIRMAS if c not in no_aplica]
-    completadas = sum(1 for c in campos_que_aplican if _get_valor_campo(firmas, c))
+    completadas = sum(1 for c in campos_que_aplican if firmas_dict[c])
     todas_firmadas = completadas == len(campos_que_aplican)
 
     
@@ -205,8 +196,8 @@ def get_estado_completo(db: Session, estudiante_id: int, periodo_id: Optional[in
         "firmas": firmas_dict,
         "todas_firmadas": todas_firmadas,
         "puede_retirarse": todas_firmadas,
-        "semaforo":          _calcular_semaforo(firmas, no_aplica),
-        "detalle_firmas":    _construir_detalle_firmas(firmas, no_aplica),
+        "semaforo":          _calcular_semaforo(firmas_dict, no_aplica),
+        "detalle_firmas":    _construir_detalle_firmas(firmas_dict, no_aplica),
         "firmas_completadas": completadas,
         "total_firmas":      len([c for c in CAMPOS_FIRMAS if c not in no_aplica]),
     }
@@ -261,7 +252,7 @@ def firmar_rectoria(db: Session, estudiante_id: int, usuario_nombre: str, period
         "salon":      "Salón",
         "secretaria": "Secretaría",
     }
-    faltantes = [c for c in firmas_previas if not _get_valor_campo(firmas, c) and c not in no_aplica]
+    faltantes = [c for c in firmas_previas if not _get_valor_auto(firmas, c, db, estudiante_id, periodo_id) and c not in no_aplica]
 
     if faltantes:
         return {
@@ -310,7 +301,8 @@ def get_pendientes(db: Session, periodo_id: Optional[int] = None) -> List[dict]:
     for estudiante in estudiantes:
         firmas = get_firmas(db, estudiante.id_estudiante, periodo_id)
         no_aplica = _get_no_aplica(db, estudiante.id_estudiante)
-        faltantes = [c for c in CAMPOS_FIRMAS if not _get_valor_campo(firmas, c) and c not in no_aplica]
+        firmas_dict = {c: _get_valor_auto(firmas, c, db, estudiante.id_estudiante, periodo_id) for c in CAMPOS_FIRMAS}
+        faltantes = [c for c in CAMPOS_FIRMAS if not _get_valor_auto(firmas, c, db, estudiante.id_estudiante, periodo_id) and c not in no_aplica]
 
         if faltantes:
             campos_aplican = [c for c in CAMPOS_FIRMAS if c not in no_aplica]
@@ -318,7 +310,7 @@ def get_pendientes(db: Session, periodo_id: Optional[int] = None) -> List[dict]:
             resultado.append(EstudiantePendienteResponse(
                 id_estudiante=estudiante.id_estudiante,
                 nombre=estudiante.nombre,
-                semaforo=_calcular_semaforo(firmas, no_aplica),
+                semaforo=_calcular_semaforo(firmas_dict, no_aplica),
                 firmas_faltantes=faltantes,
                 firmas_completadas=completadas,
                 total_firmas=len(campos_aplican),
@@ -330,3 +322,112 @@ def obtener_sello() -> dict:
     if not os.path.exists(SELLO_PATH):
         return {"error": "Sello no encontrado"}
     return {"ruta": SELLO_PATH, "hash": _hash_sello()}
+
+def get_titular_pendientes(db: Session, usuario_id: int, periodo_id: Optional[int] = None) -> dict:
+    if not periodo_id:
+        periodo = _get_periodo_activo(db)
+        if not periodo:
+            return {"error": "No hay periodo activo", "codigo": 400}
+        periodo_id = periodo.id_periodo
+    
+    salon = db.query(Salon).filter(
+        Salon.id_usuario == usuario_id,
+        Salon.id_periodo == periodo_id
+    ).first()
+    if not salon:
+        return {"error": "No tienes un salón asignado", "codigo": 404}
+    
+    estudiantes_data = []
+    for estudiante in salon.estudiantes:
+        firmas = get_firmas(db, estudiante.id_estudiante, periodo_id)
+        no_aplica = _get_no_aplica(db, estudiante.id_estudiante)
+        firmas_dict = {c: _get_valor_auto(firmas, c, db, estudiante.id_estudiante, periodo_id) for c in CAMPOS_FIRMAS}
+        salon_firmado = _get_valor_auto(firmas, "salon", db, estudiante.id_estudiante, periodo_id)
+
+        faltantes = [c for c in CAMPOS_FIRMAS if not _get_valor_auto(firmas, c, db, estudiante.id_estudiante, periodo_id) and c not in no_aplica]
+        campos_aplican = [c for c in CAMPOS_FIRMAS if c not in no_aplica]
+        estudiantes_data.append({
+            "id_estudiante": estudiante.id_estudiante,
+            "nombre": estudiante.nombre,
+            "semaforo": _calcular_semaforo(firmas_dict, no_aplica),
+            "salon_firmado": salon_firmado,
+            "firmas_completadas": len(campos_aplican) - len(faltantes),
+            "total_firmas": len(campos_aplican),
+            "firmas_faltantes": faltantes,
+        })
+    
+    return {
+        "id_salon": salon.id_salon,
+        "grado": salon.grado,
+        "grupo": salon.grupo,
+        "total_estudiantes": len(estudiantes_data),
+        "pendientes_salon": sum(1 for e in estudiantes_data if not e["salon_firmado"]),
+        "estudiantes": estudiantes_data,
+    }
+
+def _auto_banda(db: Session, estudiante_id: int) -> Optional[bool]:
+    asociado = db.query(EstudianteBanda).filter(
+        EstudianteBanda.id_estudiante == estudiante_id,
+        EstudianteBanda.activo == True
+    ).first()
+    if not asociado:
+        return None 
+    
+    pendiente = db.query(PrestamoInstrumento).filter(
+        PrestamoInstrumento.id_estudiante == estudiante_id,
+        PrestamoInstrumento.estado_entrega == "Pendiente"
+    ).first()
+    return pendiente is None
+
+def _auto_uniforme(db: Session, estudiante_id: int) -> bool:
+    pendiente = db.query(PrestamoObjeto).filter(
+        PrestamoObjeto.id_estudiante == estudiante_id,
+        PrestamoObjeto.estado_entrega == "Pendiente"
+    ).first()
+    return pendiente is None
+
+def _auto_tesoreria(db: Session, estudiante_id: int, periodo_id: int) -> bool:
+    matricula = db.query(Matricula).filter(
+        Matricula.id_estudiante == estudiante_id,
+        Matricula.id_periodo == periodo_id
+    ).first()
+    if not matricula:
+        return True 
+    
+    pendiente = db.query(DetalleMatricula).filter(
+        DetalleMatricula.id_matricula == matricula.id_matricula,
+        DetalleMatricula.estado == "Pendiente"
+    ).first()
+    return pendiente is None
+
+def _auto_salon(db: Session, estudiante_id: int) -> bool:
+    if db.query(Prueba).filter(
+        Prueba.id_estudiante == estudiante_id,
+        Prueba.estado == "Pendiente"
+    ).first():
+        return False
+    if db.query(Pupitre).filter(
+        Pupitre.id_estudiante == estudiante_id,
+        Pupitre.estado == "Pendiente"
+    ).first():
+        return False
+    if db.query(PrestamoLibro).filter(
+        PrestamoLibro.id_estudiante == estudiante_id,
+        PrestamoLibro.estado == "Pendiente"
+    ).first():
+        return False
+    return True
+
+def _get_valor_auto(firma: FirmasPazYSalvo, campo: str, db: Session, estudiante_id: int, periodo_id: int) -> bool:
+    if _get_valor_campo(firma, campo):
+        return True
+    if campo == "banda":
+        auto = _auto_banda(db, estudiante_id)
+        return auto if auto is not None else False
+    elif campo == "uniforme":
+        return _auto_uniforme(db, estudiante_id)
+    elif campo == "tesoreria":
+        return _auto_tesoreria(db, estudiante_id, periodo_id)
+    elif campo == "salon":
+        return _auto_salon(db, estudiante_id)
+    return False

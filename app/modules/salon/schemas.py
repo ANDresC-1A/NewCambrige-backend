@@ -6,7 +6,7 @@ from datetime import date
 # ======================
 class SalonBase(BaseModel):
     grado: int
-    grupo: int
+    grupo: str
     id_usuario: Optional[int] = None
     id_periodo: Optional[int] = None
 
@@ -17,7 +17,7 @@ class SalonCreate(SalonBase):
 
 class SalonUpdate(BaseModel):
     grado: Optional[int] = None
-    grupo: Optional[int] = None
+    grupo: Optional[str] = None
     id_usuario: Optional[int] = None
     id_periodo: Optional[int] = None
 

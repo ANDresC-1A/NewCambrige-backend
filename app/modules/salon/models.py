@@ -13,7 +13,7 @@ class Salon(Base):
     id_salon = Column(Integer, primary_key=True, index=True)
     id_usuario = Column(Integer, ForeignKey("usuario.id_usuario"))
     grado = Column(Integer, nullable=False)
-    grupo = Column(Integer, nullable=False)
+    grupo = Column(String(1), nullable=False)
     id_periodo = Column(Integer, ForeignKey("periodo_academico.id_periodo"))
 
     periodo = relationship("PeriodoAcademico")

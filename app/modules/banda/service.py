@@ -26,6 +26,9 @@ def registrar_auditoria(db: Session, current_user, modulo: str, accion: str, ent
     )
     db.add(auditoria)
     
+def get_auditoria_all(db: Session) -> List[AuditoriaBanda]:
+    return db.query(AuditoriaBanda).order_by(AuditoriaBanda.id_auditoria.desc()).all()
+    
     
 # ============ CATEGORÍAS ============
 def get_categorias_all(db: Session, skip: int = 0, limit: int = 100) -> List[Categoria]:
@@ -123,9 +126,27 @@ def get_instrumento_by_id(db: Session, instrumento_id: int) -> Optional[Inventar
         joinedload(InventarioInstrumento.ubicacion)
     ).filter(InventarioInstrumento.id_instrumento == instrumento_id).first()
 
-def create_instrumento(db: Session, data: dict) -> InventarioInstrumento:
+def create_instrumento(db: Session, data: dict, current_user) -> InventarioInstrumento:
+    existente = db.query(InventarioInstrumento).filter(InventarioInstrumento.codigo == data["codigo"]).first()
+    if existente:
+        raise ValueError("El código del instrumento ya se encuentra registrado.")
+    
+    data["cantidad_disponible"] = data["cantidad_total"]
     nuevo = InventarioInstrumento(**data)
     db.add(nuevo)
+    
+    registrar_auditoria(
+        db, 
+        current_user, 
+        "Inventario", 
+        "Instrumento registrado", 
+        f"{data['codigo']} - {data['nombre']}", 
+        "—", 
+        str(data["cantidad_total"]), 
+        "EXITOSO", 
+        "Se registró un nuevo instrumento."
+    )
+    
     db.commit()
     db.refresh(nuevo)
     return nuevo
@@ -224,7 +245,7 @@ def create_prestamo(db: Session, data: dict, current_user) -> Optional[PrestamoI
     prestamo = PrestamoInstrumento(
         id_instrumento=data["id_instrumento"],
         id_estudiante=data["id_estudiante"],
-        fecha_prestamo=datetime.today(),
+        fecha_prestamo=datetime.now(),
         observacion=data.get("observacion"),
         estado_entrega="prestado"
     )
@@ -243,8 +264,9 @@ def devolver_instrumento(db: Session, prestamo_id: int, data: dict, current_user
     if not prestamo:
         return None
     
-    if prestamo.estado_entrega != "prestado":
-        raise ValueError("El instrumento ya fue devuelto")
+    # Si ya está devuelto, simplemente lo devolvemos sin error para sincronizar el front
+    if prestamo.estado_entrega == "devuelto":
+        return prestamo
         
     estado_devolucion = data.get("estado_al_devolver")
     observaciones = data.get("observaciones")
@@ -255,15 +277,21 @@ def devolver_instrumento(db: Session, prestamo_id: int, data: dict, current_user
     prestamo.estado_entrega = "devuelto"
     prestamo.estado_al_devolver = estado_devolucion
     prestamo.observacion = observaciones if observaciones else prestamo.observacion
-    prestamo.fecha_devolucion = datetime.today()
+    # ✅ Usamos datetime.now() para precisión de hora en auditoría
+    prestamo.fecha_devolucion = datetime.now() 
+    
     instrumento = get_instrumento_by_id(db, prestamo.id_instrumento)
     if instrumento:
         if estado_devolucion == "Bueno":
             instrumento.cantidad_disponible += 1
         else:
+            # Si el estado es malo, el instrumento queda fuera de servicio
             instrumento.estado = "En mantenimiento"
             
-    registrar_auditoria(db, current_user, "Devoluciones", "Devolución registrada", f"Inst: {instrumento.codigo}, Est: {prestamo.estudiante.nombre}", "Prestado", f"Devuelto ({estado_devolucion})", "EXITOSO", "Se registró la devolución del instrumento.")
+    registrar_auditoria(db, current_user, "Devoluciones", "Devolución registrada", 
+                        f"Inst: {instrumento.codigo}, Est: {prestamo.estudiante.nombre}", 
+                        "Prestado", f"Devuelto ({estado_devolucion})", "EXITOSO", 
+                        "Se registró la devolución del instrumento.")
     
     db.commit()
     db.refresh(prestamo)

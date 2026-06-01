@@ -113,3 +113,19 @@ class PrestamoActivoResponse(BaseModel):
     estudiante: str
     fecha_prestamo: datetime
     dias_prestado: int
+    
+class AuditoriaBandaResponse(BaseModel):
+    id_auditoria: int
+    fecha: date
+    hora: datetime
+    nombre_usuario: str
+    modulo_origen: str
+    tipo_accion: str
+    entidad_afectada: str
+    valor_anterior: Optional[str] = None
+    valor_nuevo: Optional[str] = None
+    resultado: str
+    descripcion: str
+
+    class Config:
+        from_attributes = True

@@ -10,7 +10,7 @@ from app.modules.banda.schemas import (
     UbicacionResponse, UbicacionCreate, UbicacionUpdate,
     InstrumentoResponse, InstrumentoCreate, InstrumentoUpdate,
     PrestamoInstrumentoResponse, PrestamoInstrumentoCreate, PrestamoInstrumentoUpdate,
-    InstrumentoDisponibleResponse, PrestamoActivoResponse
+    InstrumentoDisponibleResponse, PrestamoActivoResponse, AuditoriaBandaResponse
 )
 from app.modules.auth.deps import require_roles
 
@@ -257,6 +257,14 @@ def historial_instrumento(instrumento_id: int, db: Session = Depends(get_db), cu
         }
         for p in prestamos
     ]
+
+# ============ AUDITORÍA ============
+@router.get("/auditoria", response_model=List[AuditoriaBandaResponse])
+def obtener_auditoria(
+    db: Session = Depends(get_db),
+    current_user = Depends(require_roles(["admin"])) # Solo el admin puede ver esto
+):
+    return service.get_auditoria_all(db)
 
 # ============ ESTADÍSTICAS ============
 @router.get("/estadisticas")

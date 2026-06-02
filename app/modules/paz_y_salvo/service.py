@@ -11,8 +11,8 @@ from app.modules.tesoreria.models import Matricula, DetalleMatricula
 from datetime import datetime
 import hashlib, os
 
-SELLO_PATH = "app/modules/paz_y_salvo/sellos/sello.svg"
-SELLO_HASH_PATH = "app/modules/paz_y_salvo/sellos/sello.svg.hash"
+SELLO_PATH = "app/modules/paz_y_salvo/sellos/sello.jpeg"
+SELLO_HASH_PATH = "app/modules/paz_y_salvo/sellos/sello.jpeg.hash"
 
 CAMPOS_FIRMAS = ["banda", "tesoreria", "uniforme", "salon", "secretaria", "rectoria"]
 
@@ -375,14 +375,14 @@ def _auto_banda(db: Session, estudiante_id: int) -> Optional[bool]:
     
     pendiente = db.query(PrestamoInstrumento).filter(
         PrestamoInstrumento.id_estudiante == estudiante_id,
-        PrestamoInstrumento.estado_entrega == "Pendiente"
+        PrestamoInstrumento.estado_entrega == "prestado"
     ).first()
     return pendiente is None
 
 def _auto_uniforme(db: Session, estudiante_id: int) -> bool:
     pendiente = db.query(PrestamoObjeto).filter(
         PrestamoObjeto.id_estudiante == estudiante_id,
-        PrestamoObjeto.estado_entrega == "Pendiente"
+        PrestamoObjeto.estado_entrega == "prestado"
     ).first()
     return pendiente is None
 

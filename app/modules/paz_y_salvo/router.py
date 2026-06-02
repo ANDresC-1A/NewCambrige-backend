@@ -185,7 +185,7 @@ def obtener_sello(
     resultado = service.obtener_sello()
     if "error" in resultado:
         raise HTTPException(404, resultado["error"])
-    return FileResponse(resultado["ruta"], media_type="image/svg+xml", headers={"X-Hash-SHA256": resultado["hash"]})
+    return FileResponse(resultado["ruta"], media_type="image/jpeg", headers={"X-Hash-SHA256": resultado["hash"]})
 
 @router.get("/sello/hash")
 def verificar_hash_sello():

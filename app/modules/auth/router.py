@@ -9,6 +9,7 @@ from app.modules.usuarios.models import Usuario
 from app.modules.auth.models import SesionUsuario
 from app.modules.auth import service
 from app.modules.auth.schemas import TokenResponse, UsuarioResponse, UsuarioCreate
+from app.modules.auth.deps import require_roles
 
 router = APIRouter()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/token")
@@ -53,11 +54,12 @@ def get_me(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
     return usuario
 
 @router.post("/register", response_model=UsuarioResponse)
-def register(data: UsuarioCreate, db: Session = Depends(get_db)):
+def register(data: UsuarioCreate, db: Session = Depends(get_db), current_user = Depends(require_roles(["admin"]))):
 
     usuario = service.crear_usuario(
         db,
         data.nombre,
+        data.documento,
         data.password,
         data.roles if hasattr(data, "roles") else None
     )

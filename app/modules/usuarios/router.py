@@ -63,6 +63,7 @@ def crear_usuario(
     return {
         "id_usuario": usuario.id_usuario,
         "nombre": usuario.nombre,
+        "documento": usuario.documento,
         "estado": usuario.estado,
         "created_at": usuario.created_at,
         "roles": roles

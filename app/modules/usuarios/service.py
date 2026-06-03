@@ -16,6 +16,9 @@ def get_usuarios_all(db: Session, skip: int = 0, limit: int = 100) -> List[Usuar
 def get_usuario_by_id(db: Session, usuario_id: int) -> Optional[Usuario]:
     return db.query(Usuario).filter(Usuario.id_usuario == usuario_id).first()
 
+def get_usuario_by_documento(db: Session, documento: str) -> Optional[Usuario]:
+    return db.query(Usuario).filter(Usuario.documento == documento).first()
+
 def get_usuario_by_nombre(db: Session, nombre: str) -> Optional[Usuario]:
     return db.query(Usuario).filter(Usuario.nombre == nombre).first()
 

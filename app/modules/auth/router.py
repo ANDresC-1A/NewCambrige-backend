@@ -54,7 +54,9 @@ def get_me(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
     return usuario
 
 @router.post("/register", response_model=UsuarioResponse)
-def register(data: UsuarioCreate, db: Session = Depends(get_db), current_user = Depends(require_roles(["admin"]))):
+def register(data: UsuarioCreate, db: Session = Depends(get_db), 
+             current_user = Depends(require_roles(["admin"]))
+             ):
 
     usuario = service.crear_usuario(
         db,
@@ -112,7 +114,7 @@ def check_session(
     ahora = datetime.utcnow()
 
     #cambiar fuera de fase de producción
-    limite = ahora - timedelta(minutes=30)
+    limite = ahora - timedelta(minutes=50)
 
     # VERIFICAR INACTIVIDAD
     if sesion.ultima_actividad < limite:

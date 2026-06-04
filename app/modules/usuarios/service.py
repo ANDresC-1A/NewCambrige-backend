@@ -35,6 +35,7 @@ def get_usuario_con_roles(db: Session, usuario_id: int) -> Optional[dict]:
         "id_usuario": usuario.id_usuario,
         "nombre": usuario.nombre,
         "estado": usuario.estado,
+        "documento": usuario.documento,
         "created_at": usuario.created_at,
         "roles": [r[0] for r in roles]
     }
@@ -106,11 +107,14 @@ def asignar_roles(db: Session, usuario_id: int, roles: List[str]) -> Optional[Us
     if not usuario:
         return None
     
+    # Limpieza adicional por si acaso
+    roles_limpios = [r for r in (roles or []) if r and isinstance(r, str)]
+    
     # Eliminar roles actuales
     db.query(RolUsuario).filter(RolUsuario.id_usuario == usuario_id).delete()
     
-    # Asignar nuevos roles
-    for rol_nombre in roles:
+    # Asignar nuevos roles solo si existen en la BD
+    for rol_nombre in roles_limpios:
         rol = get_rol_by_nombre(db, rol_nombre)
         if rol:
             db.add(RolUsuario(id_usuario=usuario_id, id_rol=rol.id_rol))

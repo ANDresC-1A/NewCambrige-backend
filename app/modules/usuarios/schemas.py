@@ -1,6 +1,8 @@
 from pydantic import BaseModel, EmailStr
 from typing import Optional, List
 from datetime import datetime
+from pydantic import BaseModel, validator
+from typing import List, Optional
 
 # ============ USUARIOS ============
 class UsuarioBase(BaseModel):
@@ -42,7 +44,14 @@ class RolResponse(RolBase):
 
 # ============ ASIGNAR ROLES ============
 class AsignarRolesRequest(BaseModel):
-    roles: List[str]
+    roles: Optional[List[str]] = None
+
+    @validator('roles', pre=True, each_item=False)
+    def limpiar_roles(cls, v):
+        if v is None:
+            return []
+        # Filtrar valores que no sean string (None, números, etc.)
+        return [r for r in v if isinstance(r, str) and r.strip()]
 
 # ============ SESIONES ============
 class SesionResponse(BaseModel):

@@ -4,7 +4,7 @@ from typing import Optional, List
 from app.core.database import get_db
 from app.shared.models import PeriodoAcademico
 from app.modules.paz_y_salvo import service
-from app.modules.paz_y_salvo.schemas import FirmasResponse, FirmasUpdate, EstadoPazSalvoResponse, RectoriaFirmaRequest, RectoriaFirmaResponse, EstudiantePendienteResponse, EstudianteRectoriaItem, DocenteRectoriaItem, DocenteRectoriaFirmaResponse
+from app.modules.paz_y_salvo.schemas import EstadoPazSalvoResponse, RectoriaFirmaRequest, RectoriaFirmaResponse, EstudiantePendienteResponse, EstudianteRectoriaItem, DocenteRectoriaItem, DocenteRectoriaFirmaResponse
 from app.modules.auth.deps import require_roles
 from app.modules.usuarios.models import Usuario, RolUsuario, Rol
 from fastapi.responses import FileResponse, StreamingResponse
@@ -49,6 +49,7 @@ def obtener_estado_paz_salvo(
         raise HTTPException(status_code=404, detail="Estudiante no encontrado")
     return resultado
 
+"""
 @router.get("/firmas/{estudiante_id}", response_model=FirmasResponse)
 def obtener_firmas(
     estudiante_id: int,
@@ -105,7 +106,7 @@ def actualizar_firmas(
         "salon": service._get_valor_campo(firmas, "salon"),
         "updated_at": firmas.updated_at,
     }
-
+"""
 @router.post("/rectoria/{estudiante_id}", response_model=RectoriaFirmaResponse, summary="Firma final de Rectoría")
 def firmar_rectoria(
     estudiante_id: int,

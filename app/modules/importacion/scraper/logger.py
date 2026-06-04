@@ -55,11 +55,15 @@ def get_logger(name: str = "webcolegios_bot") -> logging.Logger:
     ch.addFilter(emoji_filter)
     logger.addHandler(ch)
 
-    # Handler archivo rotativo (OPS-02) eliminado segun requerimientos (toda trazabilidad va a BD)
-    # lh = TimedRotatingFileHandler(log_file_live, when="midnight", interval=1, backupCount=7, encoding="utf-8")
-    # lh.setLevel(logging.DEBUG)
-    # lh.setFormatter(fmt)
-    # lh.addFilter(emoji_filter)
-    # logger.addHandler(lh)
+    # Handler archivo rotativo (OPS-02) restaurado segun requerimientos (evitar sobrecarga de BD)
+    log_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "logs")
+    os.makedirs(log_dir, exist_ok=True)
+    log_file_live = os.path.join(log_dir, "bot.log")
+
+    lh = TimedRotatingFileHandler(log_file_live, when="midnight", interval=1, backupCount=7, encoding="utf-8")
+    lh.setLevel(logging.DEBUG)
+    lh.setFormatter(fmt)
+    lh.addFilter(emoji_filter)
+    logger.addHandler(lh)
 
     return logger

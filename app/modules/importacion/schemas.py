@@ -1,19 +1,19 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List, Optional
 from datetime import datetime
 
 class EstudianteImportBase(BaseModel):
-    documento: Optional[str] = None
-    nombre: Optional[str] = None
-    grado: Optional[str] = None
-    curso: Optional[str] = None
-    jornada: Optional[str] = None
+    documento: Optional[str] = Field(None, max_length=100)
+    nombre: Optional[str] = Field(None, max_length=255)
+    grado: Optional[str] = Field(None, max_length=100)
+    curso: Optional[str] = Field(None, max_length=100)
+    jornada: Optional[str] = Field(None, max_length=100)
 
 class DocenteImportBase(BaseModel):
-    documento: Optional[str] = None
-    nombre: Optional[str] = None
-    grado_titular: Optional[str] = None
-    curso_titular: Optional[str] = None
+    documento: Optional[str] = Field(None, max_length=100)
+    nombre: Optional[str] = Field(None, max_length=255)
+    grado_titular: Optional[str] = Field(None, max_length=100)
+    curso_titular: Optional[str] = Field(None, max_length=100)
 
 class CargaMasivaRequest(BaseModel):
     tipo: str # "estudiante" o "docente"
@@ -32,17 +32,7 @@ class EjecucionBotResponse(BaseModel):
     registros_docentes: int
     errores: int
     tipo_ejecucion: str
-
-    class Config:
-        from_attributes = True
-
-class ErrorImportacionResponse(BaseModel):
-    id: int
-    ejecucion_id: int
-    tipo_origen: str
-    registro_referencia: Optional[str] = None
-    mensaje_error: str
-    fecha_error: datetime
+    usuario_id: Optional[int] = None
 
     class Config:
         from_attributes = True

@@ -15,21 +15,8 @@ class EjecucionBot(Base):
     usuario_id = Column(Integer, nullable=True)
     tipo_ejecucion = Column(String(50), nullable=False) # scraping, masiva, individual
 
-    errores_importacion = relationship("ErrorImportacion", back_populates="ejecucion")
     staging_estudiantes = relationship("StagingEstudiante", back_populates="ejecucion")
     staging_docentes = relationship("StagingDocente", back_populates="ejecucion")
-
-
-class ErrorImportacion(Base):
-    __tablename__ = "errores_importacion"
-    id = Column(Integer, primary_key=True, index=True)
-    ejecucion_id = Column(Integer, ForeignKey("ejecuciones_bot.id"), nullable=False)
-    tipo_origen = Column(String(50), nullable=False) # estudiante, docente
-    registro_referencia = Column(String(255), nullable=True)
-    mensaje_error = Column(String, nullable=False)
-    fecha_error = Column(TIMESTAMP(timezone=True), server_default=func.now())
-
-    ejecucion = relationship("EjecucionBot", back_populates="errores_importacion")
 
 
 class StagingEstudiante(Base):
@@ -62,3 +49,4 @@ class StagingDocente(Base):
     fecha_carga = Column(TIMESTAMP(timezone=True), server_default=func.now())
 
     ejecucion = relationship("EjecucionBot", back_populates="staging_docentes")
+

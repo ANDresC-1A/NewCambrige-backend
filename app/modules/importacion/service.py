@@ -87,14 +87,7 @@ class ImportacionService:
     def _obtener_credenciales(self):
         credencial = self.repo.db.query(CredencialesLogin).first()
         if not credencial:
-            credencial = CredencialesLogin(
-                url="https://www.webcolegios.com/clararincon/",
-                nombre_usuario="60267973",
-                password_hash="0870"
-            )
-            self.repo.db.add(credencial)
-            self.repo.db.commit()
-            self.repo.db.refresh(credencial)
+            raise ValueError("No hay credenciales configuradas en la base de datos para WebColegios. Por favor configúrelas primero.")
         return credencial
 
     def _procesar_estudiantes(self, ejecucion_id, context, page, url, usuario, password):
@@ -320,8 +313,7 @@ class ImportacionService:
     def obtener_ejecucion(self, id: int):
         return self.repo.obtener_ejecucion(id)
         
-    def obtener_errores(self, limit: int = 100, skip: int = 0):
-        return self.repo.obtener_errores(limit, skip)
+
 
     def sincronizar_estudiantes(self, ejecucion_id: int):
         from app.modules.estudiantes.models import Estudiante

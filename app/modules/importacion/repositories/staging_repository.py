@@ -1,5 +1,8 @@
 from sqlalchemy.orm import Session
-from app.modules.importacion.models import EjecucionBot, ErrorImportacion, StagingEstudiante, StagingDocente
+from app.modules.importacion.models import EjecucionBot, StagingEstudiante, StagingDocente
+from app.modules.importacion.scraper.logger import get_logger
+
+logger = get_logger("importacion_repo")
 
 class StagingRepository:
     def __init__(self, db: Session):
@@ -25,14 +28,7 @@ class StagingRepository:
             self.db.refresh(ejecucion)
 
     def registrar_error(self, ejecucion_id: int, tipo_origen: str, mensaje: str, registro_referencia: str = None):
-        error = ErrorImportacion(
-            ejecucion_id=ejecucion_id,
-            tipo_origen=tipo_origen,
-            mensaje_error=mensaje,
-            registro_referencia=registro_referencia
-        )
-        self.db.add(error)
-        self.db.commit()
+        logger.error(f"Ejecucion [{ejecucion_id}] | {tipo_origen} | Ref: {registro_referencia or 'N/A'} | {mensaje}")
 
     def insertar_staging_estudiante(self, ejecucion_id: int, datos: dict):
         st = StagingEstudiante(
@@ -62,6 +58,3 @@ class StagingRepository:
         
     def obtener_ejecucion(self, ejecucion_id: int):
         return self.db.query(EjecucionBot).filter(EjecucionBot.id == ejecucion_id).first()
-
-    def obtener_errores(self, limit: int = 100, skip: int = 0):
-        return self.db.query(ErrorImportacion).order_by(ErrorImportacion.id.desc()).offset(skip).limit(limit).all()

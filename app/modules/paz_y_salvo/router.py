@@ -4,10 +4,10 @@ from typing import Optional, List
 from app.core.database import get_db
 from app.shared.models import PeriodoAcademico
 from app.modules.paz_y_salvo import service
-from app.modules.paz_y_salvo.schemas import FirmasResponse, FirmasUpdate, EstadoPazSalvoResponse, RectoriaFirmaRequest, RectoriaFirmaResponse, EstudiantePendienteResponse
+from app.modules.paz_y_salvo.schemas import FirmasResponse, FirmasUpdate, EstadoPazSalvoResponse, RectoriaFirmaRequest, RectoriaFirmaResponse, EstudiantePendienteResponse, EstudianteRectoriaItem, DocenteRectoriaItem, DocenteRectoriaFirmaResponse
 from app.modules.auth.deps import require_roles
 from app.modules.usuarios.models import Usuario, RolUsuario, Rol
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 
 router = APIRouter()
 
@@ -187,6 +187,102 @@ def obtener_sello(
         raise HTTPException(404, resultado["error"])
     return FileResponse(resultado["ruta"], media_type="image/jpeg", headers={"X-Hash-SHA256": resultado["hash"]})
 
-@router.get("/sello/hash")
-def verificar_hash_sello():
-    return service.verificar_sello()
+
+@router.get("/estudiantes-rectoria", response_model=List[EstudianteRectoriaItem])
+def listar_estudiantes_para_rectoria(
+    periodo_id: Optional[int] = Query(None),
+    grado: Optional[str] = Query(None),
+    semaforo: Optional[str] = Query(None),
+    nombre: Optional[str] = Query(None),
+    documento: Optional[str] = Query(None),
+    grupo: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_roles(["admin", "rectoria"])),
+):
+    periodo_id_valido = _validar_acceso_periodo(periodo_id, current_user, db)
+    return service.listar_estudiantes_para_rectoria(db, periodo_id_valido, grado, semaforo, nombre, documento, grupo)
+
+@router.get("/docentes-rectoria", response_model=List[DocenteRectoriaItem])
+def listar_docentes_para_rectoria_endpoint(
+    periodo_id: Optional[int] = Query(None),
+    nombre: Optional[str] = Query(None),
+    documento: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_roles(["admin", "rectoria"])),
+):
+    periodo_id_valido = _validar_acceso_periodo(periodo_id, current_user, db)
+    return service.listar_docentes_para_rectoria(
+        db, periodo_id_valido, nombre, documento
+    )
+
+@router.post("/rectoria/docente/{docente_id}", response_model=DocenteRectoriaFirmaResponse)
+def firmar_rectoria_docente_endpoint(
+    docente_id: int,
+    periodo_id: Optional[int] = Query(None),
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_roles(["admin", "rectoria"])),
+):
+    resultado = service.firmar_rectoria_docente(
+        db, docente_id, current_user.nombre, current_user.id_usuario, periodo_id
+    )
+    if "error" in resultado:
+        raise HTTPException(resultado["codigo"], resultado["error"])
+    return resultado
+
+@router.get("/descargar-pdf/estudiante/{estudiante_id}")
+def descargar_pdf_estudiante_endpoint(
+    estudiante_id: int,
+    periodo_id: Optional[int] = Query(None),
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_roles(["admin", "rectoria"])),
+):
+    periodo_id_valido = _validar_acceso_periodo(periodo_id, current_user, db)
+    try:
+        pdf_bytes = service.descargar_pdf_estudiante(db, estudiante_id, periodo_id_valido)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    nombre_archivo = f"paz_y_salvo_estudiante_{estudiante_id}.pdf"
+    return StreamingResponse(
+        iter([pdf_bytes]),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={nombre_archivo}"},
+    )
+
+
+@router.get("/descargar-pdf/docente/{docente_id}")
+def descargar_pdf_docente_endpoint(
+    docente_id: int,
+    periodo_id: Optional[int] = Query(None),
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_roles(["admin", "rectoria"])),
+):
+    periodo_id_valido = _validar_acceso_periodo(periodo_id, current_user, db)
+    try:
+        pdf_bytes = service.descargar_pdf_docente(db, docente_id, periodo_id_valido)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    nombre_archivo = f"paz_y_salvo_docente_{docente_id}.pdf"
+    return StreamingResponse(
+        iter([pdf_bytes]),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={nombre_archivo}"},
+    )
+
+@router.get("/descargar-pdf/estudiantes/batch")
+def descargar_pdf_estudiantes_batch_endpoint(
+    periodo_id: int = Query(...),
+    grado: str = Query(...),
+    grupo: str = Query(...),
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_roles(["admin", "rectoria"])),
+):
+    periodo_id_valido = _validar_acceso_periodo(periodo_id, current_user, db)
+    zip_bytes = service.descargar_pdf_estudiantes_batch(
+        db, periodo_id_valido, grado, grupo
+    )
+    nombre = f"paz_y_salvo_grado_{grado}_grupo_{grupo}.zip"
+    return StreamingResponse(
+        iter([zip_bytes]),
+        media_type="application/zip",
+        headers={"Content-Disposition": f"attachment; filename={nombre}"},
+    )

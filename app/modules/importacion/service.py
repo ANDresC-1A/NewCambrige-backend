@@ -148,12 +148,7 @@ class ImportacionService:
         titulares = extraer_titulares_de_pdfs(rutas_titulares)
         print("FIN extraer_titulares_de_pdfs", flush=True)
 
-        # Re-autenticar nuevamente antes de la fase de lista de docentes para evitar estado corrupto de sesión
-        print("INICIO re-autenticar para DOCENTES LISTA", flush=True)
-        context.clear_cookies()
-        if not autenticar(page, url=url, usuario=usuario, password=password, tipo_usuario="Administrativo"):
-            raise Exception("Fallo la re-autenticacion en WebColegios para docentes")
-        print("FIN re-autenticar para DOCENTES LISTA", flush=True)
+
 
         print("INICIO navegar_y_descargar_docentes", flush=True)
         ruta_docentes = navegar_y_descargar_docentes(page)
@@ -178,6 +173,9 @@ class ImportacionService:
         return reg_doc, errores
 
     def iniciar_scraping_estudiantes(self, usuario_id: int = None):
+        import time
+        inicio_perf = time.perf_counter()
+        
         credencial = self._obtener_credenciales()
         ejecucion = self.repo.crear_ejecucion(tipo_ejecucion="scraping_estudiantes", usuario_id=usuario_id)
         
@@ -210,15 +208,22 @@ class ImportacionService:
 
         self.repo.finalizar_ejecucion(ejecucion.id, estado_final, reg_est, reg_doc, errores)
         
+        fin_perf = time.perf_counter()
+        duracion = round(fin_perf - inicio_perf, 2)
+        
         return {
             "ejecucion_id": ejecucion.id,
             "estado": estado_final,
             "registros_estudiantes": reg_est,
             "registros_docentes": reg_doc,
-            "errores": errores
+            "errores": errores,
+            "duracion_segundos": duracion
         }
 
     def iniciar_scraping_docentes(self, usuario_id: int = None):
+        import time
+        inicio_perf = time.perf_counter()
+        
         credencial = self._obtener_credenciales()
         ejecucion = self.repo.crear_ejecucion(tipo_ejecucion="scraping_docentes", usuario_id=usuario_id)
         
@@ -249,12 +254,16 @@ class ImportacionService:
 
         self.repo.finalizar_ejecucion(ejecucion.id, estado_final, reg_est, reg_doc, errores)
         
+        fin_perf = time.perf_counter()
+        duracion = round(fin_perf - inicio_perf, 2)
+        
         return {
             "ejecucion_id": ejecucion.id,
             "estado": estado_final,
             "registros_estudiantes": reg_est,
             "registros_docentes": reg_doc,
-            "errores": errores
+            "errores": errores,
+            "duracion_segundos": duracion
         }
 
     def iniciar_scraping(self, usuario_id: int = None):
@@ -394,3 +403,165 @@ class ImportacionService:
             "actualizados": actualizados,
             "rechazados": rechazados
         }
+
+    def sincronizar_docentes(self, ejecucion_id: int):
+        from app.modules.usuarios.models import Usuario, Rol, RolUsuario
+        from app.modules.importacion.models import StagingDocente
+        from app.modules.salon.models import Salon
+        from app.modules.auth.service import hash_contra
+        from app.modules.importacion.salon_resolver import SalonResolverService
+        from app.shared.models import PeriodoAcademico
+
+        # Paso 1: Verificacion de Rol Base "Titular"
+        rol_titular = self.repo.db.query(Rol).filter(Rol.nombre == "Titular").first()
+        if not rol_titular:
+            rol_titular = Rol(nombre="Titular")
+            self.repo.db.add(rol_titular)
+            self.repo.db.commit()
+            self.repo.db.refresh(rol_titular)
+
+        # Pre-validacion de periodo activo
+        periodo_activo = self.repo.db.query(PeriodoAcademico).filter(PeriodoAcademico.activo == True).first()
+
+        docentes_staging = self.repo.db.query(StagingDocente).filter(
+            StagingDocente.ejecucion_id == ejecucion_id
+        ).all()
+
+        # Pre-escanear conflictos de titularidad en el lote
+        # dict map: salon_key -> list of staging docs
+        asignaciones_lote = {}
+        for stg in docentes_staging:
+            if stg.grado_titular and stg.curso_titular:
+                try:
+                    g_str = SalonResolverService.normalizar_grado(stg.grado_titular)
+                    c_str = SalonResolverService.normalizar_grupo(stg.curso_titular)
+                    s_key = f"{g_str}_{c_str}"
+                    if s_key not in asignaciones_lote:
+                        asignaciones_lote[s_key] = []
+                    asignaciones_lote[s_key].append(stg)
+                except Exception:
+                    pass
+
+        # Marcar conflictos
+        for s_key, docs in asignaciones_lote.items():
+            if len(docs) > 1:
+                for doc in docs:
+                    doc._has_conflict = True
+
+        procesados = 0
+        insertados = 0
+        actualizados = 0
+        roles_asignados = 0
+        titularidades_asignadas = 0
+        rechazados = 0
+
+        for stg in docentes_staging:
+            procesados += 1
+            try:
+                # Validacion de documento
+                if not stg.documento or str(stg.documento).strip() == "":
+                    raise ValueError("documento es NULL o vacio")
+
+                doc_str = str(stg.documento).strip()
+                if len(doc_str) > 10:
+                    raise ValueError(f"documento excede 10 caracteres: '{doc_str}'")
+
+                nom_str = str(stg.nombre).strip() if stg.nombre else ""
+                if not nom_str:
+                    raise ValueError("nombre es NULL o vacio")
+                if len(nom_str) > 100:
+                    nom_str = nom_str[:100]
+
+                # Conflicto previo detectado en lote
+                if getattr(stg, '_has_conflict', False):
+                    raise ValueError("Conflicto de titularidad detectado en el mismo lote para el salon")
+
+                # Paso 3: Resolver Usuario
+                usuario = self.repo.db.query(Usuario).filter(Usuario.documento == doc_str).first()
+                if usuario:
+                    if usuario.nombre != nom_str:
+                        usuario.nombre = nom_str
+                    actualizados += 1
+                else:
+                    usuario = Usuario(
+                        nombre=nom_str,
+                        documento=doc_str,
+                        estado=True,
+                        contrasena=hash_contra(doc_str)
+                    )
+                    self.repo.db.add(usuario)
+                    self.repo.db.flush() # flush to get id_usuario
+                    insertados += 1
+
+                # Paso 4: Asignar Rol Titular
+                if usuario.id_usuario:
+                    rol_exists = self.repo.db.query(RolUsuario).filter(
+                        RolUsuario.id_usuario == usuario.id_usuario,
+                        RolUsuario.id_rol == rol_titular.id_rol
+                    ).first()
+                    
+                    if not rol_exists:
+                        self.repo.db.add(RolUsuario(id_usuario=usuario.id_usuario, id_rol=rol_titular.id_rol))
+                        roles_asignados += 1
+
+                # Paso 5 & 6: Resolver Titularidad
+                if stg.grado_titular and stg.curso_titular:
+                    if not periodo_activo:
+                        raise ValueError("No existe periodo academico activo para asignar titularidad")
+                    
+                    grado_str = SalonResolverService.normalizar_grado(stg.grado_titular)
+                    grupo_str = SalonResolverService.normalizar_grupo(stg.curso_titular)
+                    
+                    # Buscar salon
+                    salon = self.repo.db.query(Salon).filter(
+                        Salon.grado == grado_str,
+                        Salon.grupo == grupo_str,
+                        Salon.id_periodo == periodo_activo.id_periodo
+                    ).first()
+                    
+                    if not salon:
+                        salon = Salon(
+                            grado=grado_str,
+                            grupo=grupo_str,
+                            id_periodo=periodo_activo.id_periodo
+                        )
+                        self.repo.db.add(salon)
+                        self.repo.db.flush()
+                    
+                    salon.id_usuario = usuario.id_usuario
+                    titularidades_asignadas += 1
+
+                stg.estado_validacion = "Sincronizado"
+                self.repo.db.commit()
+
+            except Exception as e:
+                self.repo.db.rollback()
+                rechazados += 1
+                stg.estado_validacion = "Error"
+                self.repo.registrar_error(
+                    ejecucion_id=ejecucion_id,
+                    tipo_origen="sincronizacion_docente",
+                    mensaje=str(e),
+                    registro_referencia=stg.documento
+                )
+                self.repo.db.commit() # commit the error state and error log
+
+        # Paso 10: Limpieza de Staging
+        try:
+            self.repo.db.query(StagingDocente).filter(
+                StagingDocente.ejecucion_id == ejecucion_id
+            ).delete(synchronize_session=False)
+            self.repo.db.commit()
+        except Exception as e:
+            self.repo.db.rollback()
+            self.repo.registrar_error(ejecucion_id, "limpieza_staging_docente", f"Fallo al limpiar staging: {str(e)}")
+
+        return {
+            "procesados": procesados,
+            "insertados": insertados,
+            "actualizados": actualizados,
+            "roles_asignados": roles_asignados,
+            "titularidades_asignadas": titularidades_asignadas,
+            "rechazados": rechazados
+        }
+

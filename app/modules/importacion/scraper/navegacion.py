@@ -406,100 +406,40 @@ def descargar_pdf_docentes(page: Page) -> str | None:
 #  DESCARGA DE PDFs DE TITULARES (Página 2 del formulario)
 # =============================================================================
 
-def descargar_pdfs_grados(page: Page) -> list[str]:
+def descargar_pdfs_grados(context: BrowserContext, page: Page) -> list[str]:
     """
-    En la Página 2 del formulario (después de 'Siguiente'), hay una lista de grados
-    con un PDF individual por cada grado/grupo. Este PDF contiene el nombre del
-    docente titular. Esta función descarga TODOS esos PDFs.
-
-    Estrategias de detección de enlaces PDF:
-    1. <a> que contiene <img> con 'pdf' en el src
-    2. <a> con href que termina en .pdf
-    3. <img> con src que contiene 'pdf' (clicable)
-    4. <a> con texto o title que menciona PDF/imprimir
+    En la Página 2 del formulario (después de 'Siguiente'), hace click en el
+    botón 'Imprimir' general, descargando un solo PDF maestro de todas
+    las páginas, el cual contiene a todos los titulares en la cabecera.
     """
-    logger.info(" Buscando PDFs individuales por grado en Página 2...")
+    logger.info(" Buscando PDF maestro de titulares en Página 2...")
     rutas_pdfs = []
     os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
     try:
-        # Esperar a que cargue la página 2
         time.sleep(2)
-
-        # Recopilar todos los selectores posibles de enlace a PDF
-        selectores = [
-            "input[type='image'][src*='print_p']",
-            "img[src*='print_p']",
-            "a:has(img[src*='pdf'])",
-            "a:has(img[src*='PDF'])",
-            "a[href*='.pdf']",
-            "a[href*='pdf']",
-            "img[src*='pdf'][onclick]",
-            "a:has-text('PDF')",
-            "a[title*='pdf' i]",
-            "a[title*='PDF']",
-            "img[alt*='pdf' i]",
-            "img[title*='pdf' i]"
-        ]
-
-        enlaces_encontrados = []
-        for sel in selectores:
+        new_page = _click_imprimir(context, page)
+        if new_page:
             try:
-                locs = page.locator(sel)
-                count = locs.count()
-                if count > 0:
-                    logger.info(f" Selector '{sel}': {count} enlace(s) encontrado(s)")
-                    for i in range(count):
-                        elemento = locs.nth(i)
-                        # Solo agregamos elementos que estén visibles
-                        if elemento.is_visible(timeout=1000):
-                            enlaces_encontrados.append(elemento)
-            except Exception:
-                continue
-
-        if not enlaces_encontrados:
-            # Fallback: buscar todas las imágenes con src='pdf' y clickearlas
-            logger.warning("️  No se encontraron enlaces PDF con selectores estándar, intentando imágenes...")
-            imgs = page.locator("img")
-            for i in range(imgs.count()):
-                try:
-                    elemento = imgs.nth(i)
-                    if not elemento.is_visible(timeout=500):
-                        continue
-                    src = elemento.get_attribute("src") or ""
-                    if "pdf" in src.lower():
-                        enlaces_encontrados.append(elemento)
-                except Exception:
-                    continue
-
-        logger.info(f" Total de posibles enlaces PDF visibles encontrados: {len(enlaces_encontrados)}")
-
-        # Filtrar duplicados referenciales (por si múltiples selectores encuentran el mismo nodo, aunque Playwright no lo hace fácil)
-        # Vamos a procesarlos y capturar excepciones si ya se descargó o no se puede interactuar.
-        pdfs_exitosos = 0
-        for idx, enlace in enumerate(enlaces_encontrados):
-            try:
-                logger.info(f"   Intentando descargar PDF {idx + 1}/{len(enlaces_encontrados)}...")
-                with page.expect_download(timeout=10000) as download_info:
-                    try:
-                        enlace.scroll_into_view_if_needed(timeout=2000)
-                    except Exception:
-                        pass # Ignorar timeout de scroll, intentar hacer click de todos modos
-                    enlace.click(timeout=3000)
-                download = download_info.value
-                path = os.path.join(DOWNLOAD_DIR, f"titulares_grado_{pdfs_exitosos}.pdf")
-                download.save_as(path)
-                rutas_pdfs.append(path)
-                pdfs_exitosos += 1
-                logger.info(f"   Guardado: titulares_grado_{pdfs_exitosos-1}.pdf")
-            except Exception as e:
-                logger.warning(f"  ️  Ignorando elemento {idx} (no descargó PDF): {e}")
-            time.sleep(0.5)
+                new_page.close()
+            except:
+                pass
+            
+        ruta_impresion = os.path.join(DOWNLOAD_DIR, "impresion.pdf")
+        if os.path.exists(ruta_impresion):
+            ruta_final = os.path.join(DOWNLOAD_DIR, "titulares_maestro.pdf")
+            if os.path.exists(ruta_final):
+                os.remove(ruta_final)
+            os.rename(ruta_impresion, ruta_final)
+            logger.info(f" PDF maestro guardado: {ruta_final}")
+            rutas_pdfs.append(ruta_final)
+        else:
+            logger.error(" No se encontró el PDF impreso maestro.")
 
     except Exception as e:
-        logger.error(f" Error general buscando PDFs de grado: {e}")
+        logger.error(f" Error general buscando PDF maestro de grados: {e}")
 
-    logger.info(f" Total PDFs descargados: {len(rutas_pdfs)}")
+    logger.info(f" Total PDFs maestros descargados: {len(rutas_pdfs)}")
     return rutas_pdfs
 
 
@@ -537,7 +477,7 @@ def navegar_pagina2_y_descargar_pdfs(context: BrowserContext, page: Page) -> lis
             return []
 
         # Paso 4: Descargar PDFs (estamos en Página 2)
-        rutas = descargar_pdfs_grados(page)
+        rutas = descargar_pdfs_grados(context, page)
 
         return rutas
 

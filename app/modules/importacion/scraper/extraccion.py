@@ -24,7 +24,7 @@ PATRON_PERSONA = re.compile(
 )
 
 MAPA_GRADOS = {
-    "00": "Preescolar", "01": "Primero", "02": "Segundo", "03": "Tercero",
+    "00": "Transicion", "01": "Primero", "02": "Segundo", "03": "Tercero",
     "04": "Cuarto", "05": "Quinto", "06": "Sexto", "07": "Septimo",
     "08": "Octavo", "09": "Noveno", "10": "Decimo", "11": "Once",
     "JA": "Jardin", "PA": "Parvulos", "PJ": "Prejardin"
@@ -172,13 +172,19 @@ def extraer_docentes(page, titulares: Dict[str, Dict] = None, registros_raw: Lis
     for r in resultados:
         nombre_norm = re.sub(r'\s+', '', r["nombre"]).lower()
         datos_titular = titulares_norm.get(nombre_norm, {})
-        docentes_finales.append({
-            "consecutivo":   r["consecutivo"],
-            "documento":     r["documento"],
-            "nombre":        r["nombre"],
-            "grado_titular": datos_titular.get("grado_titular", None),
-            "curso_titular": datos_titular.get("curso_titular", None),
-        })
+        
+        grado_titular = datos_titular.get("grado_titular", None)
+        curso_titular = datos_titular.get("curso_titular", None)
+        
+        # Filtramos para retornar únicamente los docentes que son titulares
+        if grado_titular and curso_titular:
+            docentes_finales.append({
+                "consecutivo":   r["consecutivo"],
+                "documento":     r["documento"],
+                "nombre":        r["nombre"],
+                "grado_titular": grado_titular,
+                "curso_titular": curso_titular,
+            })
 
     return docentes_finales
 
@@ -219,66 +225,60 @@ def extraer_titulares_de_pdfs(rutas_pdfs: List[str]) -> Dict[str, Dict[str, str]
 
         try:
             with pdfplumber.open(pdf_path) as pdf:
-                # Leer todo el texto del PDF (no solo primera página)
-                texto_completo = ""
                 for pagina in pdf.pages:
-                    t = pagina.extract_text()
-                    if t:
-                        texto_completo += t + "\n"
+                    texto_pagina = pagina.extract_text()
+                    if not texto_pagina or not texto_pagina.strip():
+                        continue
 
-            if not texto_completo.strip():
-                logger.warning(f"️  PDF vacío: {os.path.basename(pdf_path)}")
-                continue
+                    nombre_titular = None
+                    grado = None
+                    curso = None
 
-            nombre_titular = None
-            grado = None
-            curso = None
+                    # ── Estrategia 1: Buscar "Titular: NOMBRE" en el header ─────────
+                    m_titular = patron_titular_header.search(texto_pagina)
+                    if m_titular:
+                        nombre_titular = _limpiar_nombre(m_titular.group(1))
 
-            # ── Estrategia 1: Buscar "Titular: NOMBRE" en el header ─────────
-            m_titular = patron_titular_header.search(texto_completo)
-            if m_titular:
-                nombre_titular = _limpiar_nombre(m_titular.group(1))
+                    m_grado = patron_grado.search(texto_pagina)
+                    if m_grado:
+                        grado = m_grado.group(1).strip().capitalize()
 
-            m_grado = patron_grado.search(texto_completo)
-            if m_grado:
-                grado = m_grado.group(1).strip().capitalize()
+                    m_curso = patron_curso.search(texto_pagina)
+                    if m_curso:
+                        curso = m_curso.group(1).strip().upper()
 
-            m_curso = patron_curso.search(texto_completo)
-            if m_curso:
-                curso = m_curso.group(1).strip().upper()
+                    # ── Estrategia 2: Usar _parsear_texto() que ya extrae el campo 'titular' ──
+                    if not nombre_titular:
+                        registros = _parsear_texto(texto_pagina)
+                        if registros and registros[0].get("titular"):
+                            nombre_titular = _limpiar_nombre(registros[0]["titular"])
+                        if registros and not grado:
+                            grado = registros[0].get("grado", "")
+                        if registros and not curso:
+                            curso = registros[0].get("curso", "")
 
-            # ── Estrategia 2: Usar _parsear_texto() que ya extrae el campo 'titular' ──
-            if not nombre_titular:
-                registros = _parsear_texto(texto_completo)
-                if registros and registros[0].get("titular"):
-                    nombre_titular = _limpiar_nombre(registros[0]["titular"])
-                if registros and not grado:
-                    grado = registros[0].get("grado", "")
-                if registros and not curso:
-                    curso = registros[0].get("curso", "")
+                    # ── Estrategia 3: Frase literal alternativa ──────────────────────
+                    if not nombre_titular:
+                        m_frase = patron_titular_frase.search(texto_pagina)
+                        if m_frase:
+                            nombre_titular = _limpiar_nombre(m_frase.group(1))
+                            grado = m_frase.group(2).strip().capitalize()
+                            curso = m_frase.group(3).strip().upper()
 
-            # ── Estrategia 3: Frase literal alternativa ──────────────────────
-            if not nombre_titular:
-                m_frase = patron_titular_frase.search(texto_completo)
-                if m_frase:
-                    nombre_titular = _limpiar_nombre(m_frase.group(1))
-                    grado = m_frase.group(2).strip().capitalize()
-                    curso = m_frase.group(3).strip().upper()
-
-            if nombre_titular:
-                titulares[nombre_titular] = {
-                    "grado_titular": grado,
-                    "curso_titular": _mapear_curso(curso),
-                }
-                logger.info(
-                    f"‍ Titular: {nombre_titular} → "
-                    f"Grado: {grado or '?'} / Curso: {_mapear_curso(curso) or '?'} "
-                    f"[{os.path.basename(pdf_path)}]"
-                )
-            else:
-                logger.warning(
-                    f"️  No se encontró titular en: {os.path.basename(pdf_path)}"
-                )
+                    if nombre_titular:
+                        titulares[nombre_titular] = {
+                            "grado_titular": grado,
+                            "curso_titular": _mapear_curso(curso),
+                        }
+                        logger.info(
+                            f"‍ Titular: {nombre_titular} → "
+                            f"Grado: {grado or '?'} / Curso: {_mapear_curso(curso) or '?'} "
+                            f"[{os.path.basename(pdf_path)}]"
+                        )
+                    else:
+                        logger.warning(
+                            f"️  No se encontró titular en una página de: {os.path.basename(pdf_path)}"
+                        )
 
         except Exception as e:
             logger.warning(f"️  Error procesando {os.path.basename(pdf_path)}: {e}")

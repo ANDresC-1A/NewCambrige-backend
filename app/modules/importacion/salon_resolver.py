@@ -9,54 +9,25 @@ class SalonResolverError(Exception):
 
 class SalonResolverService:
 
-    _MAPEO_GRADOS = {
-        "preescolar": 0,
-        "primero": 1,
-        "segundo": 2,
-        "tercero": 3,
-        "cuarto": 4,
-        "quinto": 5,
-        "sexto": 6,
-        "septimo": 7,
-        "octavo": 8,
-        "noveno": 9,
-        "decimo": 10,
-        "once": 11,
-        "parvulos": 12,
-        "jardin": 13,
-        "prejardin": 14,
-        "transicion": 15
-    }
+    @staticmethod
+    def normalizar_grado(grado_str: str) -> str:
+        if not grado_str:
+            raise SalonResolverError("Grado vacío")
+        grado_str = str(grado_str).strip()
+        # Eliminar tildes
+        grado_str = ''.join(c for c in unicodedata.normalize('NFD', grado_str) if unicodedata.category(c) != 'Mn')
+        # Eliminar espacios sobrantes y convertir a Title Case
+        grado_str = ' '.join(grado_str.split())
+        return grado_str.title()
 
     @staticmethod
-    def _limpiar_texto(texto: str) -> str:
-        if not texto:
-            return ""
-        # Convert to lowercase
-        texto = texto.lower().strip()
-        # Remove accents
-        texto = ''.join(c for c in unicodedata.normalize('NFD', texto) if unicodedata.category(c) != 'Mn')
-        return texto
-
-    @staticmethod
-    def mapear_grado(grado_str: str) -> int:
-        limpio = SalonResolverService._limpiar_texto(grado_str)
-        if limpio in SalonResolverService._MAPEO_GRADOS:
-            return SalonResolverService._MAPEO_GRADOS[limpio]
-        raise SalonResolverError(f"Grado desconocido no se puede mapear: '{grado_str}'")
-
-    @staticmethod
-    def mapear_grupo(grupo_str: str) -> int:
-        limpio = SalonResolverService._limpiar_texto(grupo_str).upper()
-        if not limpio:
-            raise SalonResolverError("Grupo vac\u00edo")
-        
-        # Simple letter to number mapping: A=1, B=2, C=3, etc.
-        char = limpio[0]
-        if 'A' <= char <= 'Z':
-            return ord(char) - ord('A') + 1
-        
-        raise SalonResolverError(f"Grupo desconocido no se puede mapear: '{grupo_str}'")
+    def normalizar_grupo(grupo_str: str) -> str:
+        if not grupo_str:
+            raise SalonResolverError("Grupo vacío")
+        grupo_str = str(grupo_str)
+        # Eliminar todos los espacios y convertir a mayúsculas
+        grupo_str = "".join(grupo_str.split())
+        return grupo_str.upper()
 
     @staticmethod
     def obtener_periodo_activo(db: Session) -> PeriodoAcademico:
@@ -66,8 +37,8 @@ class SalonResolverService:
         return periodo
 
     @staticmethod
-    def resolver_o_crear_salon(db: Session, grado_int: int, grupo_int: int, id_periodo: int, cache: dict) -> int:
-        key = (grado_int, grupo_int, id_periodo)
+    def resolver_o_crear_salon(db: Session, grado_str: str, grupo_str: str, id_periodo: int, cache: dict) -> int:
+        key = (grado_str, grupo_str, id_periodo)
         
         # 1. Buscar en cach\u00e9 local (evita duplicidad concurrente/en el mismo lote)
         if key in cache:
@@ -75,8 +46,8 @@ class SalonResolverService:
         
         # 2. Buscar en base de datos
         salon = db.query(Salon).filter(
-            Salon.grado == grado_int,
-            Salon.grupo == grupo_int,
+            Salon.grado == grado_str,
+            Salon.grupo == grupo_str,
             Salon.id_periodo == id_periodo
         ).first()
 
@@ -86,10 +57,9 @@ class SalonResolverService:
 
         # 3. Crear el sal\u00f3n si no existe
         nuevo_salon = Salon(
-            grado=grado_int,
-            grupo=grupo_int,
+            grado=grado_str,
+            grupo=grupo_str,
             id_periodo=id_periodo
-            # id_usuario is nullable based on models.py
         )
         db.add(nuevo_salon)
         db.commit() # Important: commit to get the ID and avoid race conditions if used elsewhere
@@ -123,13 +93,13 @@ class SalonResolverService:
 
         for est in estudiantes:
             try:
-                grado_int = SalonResolverService.mapear_grado(est.grado)
-                grupo_int = SalonResolverService.mapear_grupo(est.curso) # WebColegios gives group in 'curso' field
+                grado_str = SalonResolverService.normalizar_grado(est.grado)
+                grupo_str = SalonResolverService.normalizar_grupo(est.curso)
                 
                 id_salon = SalonResolverService.resolver_o_crear_salon(
                     db, 
-                    grado_int, 
-                    grupo_int, 
+                    grado_str, 
+                    grupo_str, 
                     periodo.id_periodo, 
                     cache_salones
                 )

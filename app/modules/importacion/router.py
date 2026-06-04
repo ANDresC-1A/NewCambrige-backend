@@ -57,3 +57,8 @@ def listar_errores(limit: int = 100, skip: int = 0, service: ImportacionService 
 @router.post("/sincronizar-estudiantes", summary="Sincroniza estudiantes desde staging hacia la tabla oficial")
 def sincronizar_estudiantes(request: SincronizarRequest, service: ImportacionService = Depends(get_importacion_service)):
     return service.sincronizar_estudiantes(ejecucion_id=request.ejecucion_id)
+
+@router.post("/sincronizar-docentes", summary="Sincroniza docentes desde staging hacia la tabla oficial")
+def sincronizar_docentes(request: SincronizarRequest, service: ImportacionService = Depends(get_importacion_service)):
+    return service.sincronizar_docentes(ejecucion_id=request.ejecucion_id)
+

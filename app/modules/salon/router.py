@@ -105,7 +105,7 @@ def actualizar_estado_prueba(
     db: Session = Depends(get_db),
     current_user = Depends(require_roles(["admin", "titular"]))
 ):
-    prueba = service.update_estado_prueba(db, prueba_id, estado)
+    prueba = service.update_estado_prueba(db, prueba_id, estado, current_user.nombre)
     if not prueba:
         raise HTTPException(status_code=404, detail="Prueba no encontrada")
     return prueba
@@ -128,7 +128,7 @@ def actualizar_pupitre(
     db: Session = Depends(get_db),
     current_user = Depends(require_roles(["admin", "titular"]))
 ):
-    pupitre = service.update_pupitre(db, pupitre_id, data.estado, data.fecha_pago)
+    pupitre = service.update_pupitre(db, pupitre_id, data.estado, data.fecha_pago, current_user.nombre)
     if not pupitre:
         raise HTTPException(status_code=404, detail="Pupitre no encontrado")
     return pupitre
@@ -151,7 +151,7 @@ def crear_libro(
     db: Session = Depends(get_db),
     current_user = Depends(require_roles(["admin", "titular"]))
 ):
-    return service.create_libro(db, data.model_dump())
+    return service.create_libro(db, data.model_dump(), current_user.nombre)
 
 
 @router.put("/libros/{libro_id}", response_model=LibroResponse)
@@ -160,7 +160,7 @@ def actualizar_libro(
     db: Session = Depends(get_db),
     current_user = Depends(require_roles(["admin", "titular"]))
 ):
-    libro = service.update_libro(db, libro_id, data.model_dump(exclude_unset=True))
+    libro = service.update_libro(db, libro_id, data.model_dump(exclude_unset=True), current_user.nombre)
     if not libro:
         raise HTTPException(status_code=404, detail="Libro no encontrado")
     return libro
@@ -172,7 +172,7 @@ def eliminar_libro(
     db: Session = Depends(get_db),
     current_user = Depends(require_roles(["admin", "titular"]))
 ):
-    if not service.delete_libro(db, libro_id):
+    if not service.delete_libro(db, libro_id, current_user.nombre):
         raise HTTPException(status_code=404, detail="Libro no encontrado")
 
 
@@ -191,7 +191,7 @@ def crear_prestamo(
     current_user = Depends(require_roles(["admin", "titular"]))
 ):
     try:
-        return service.create_prestamo(db, data.model_dump())
+        return service.create_prestamo(db, data.model_dump(), current_user.nombre)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -203,7 +203,7 @@ def devolver_libro_prestado(
     db: Session = Depends(get_db),
     current_user = Depends(require_roles(["admin", "titular"]))
 ):
-    prestamo = service.registrar_devolucion(db, prestamo_id, data.model_dump())
+    prestamo = service.registrar_devolucion(db, prestamo_id, data.model_dump(), current_user.nombre)
     if not prestamo:
         raise HTTPException(status_code=404, detail="Registro de préstamo no encontrado")
     return prestamo

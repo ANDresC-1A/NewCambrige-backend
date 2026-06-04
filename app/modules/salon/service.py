@@ -1,4 +1,5 @@
 from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import or_
 from app.shared.models import Auditoria
 from typing import List, Optional
 from datetime import date
@@ -542,9 +543,18 @@ def delete_libro(db: Session, libro_id: int, current_user_name: str) -> bool:
         raise e
     
 def create_prestamo(db: Session, data: dict, current_user_name: str) -> dict:
-    estudiante = db.query(Estudiante).filter(Estudiante.documento == str(data.get("codigo"))).first()
+    codigo_raw = str(data.get("codigo", "")).strip()
+    codigo_padded = codigo_raw.zfill(10)
+    
+
+    estudiante = db.query(Estudiante).filter(
+        or_(
+            Estudiante.documento == codigo_raw,
+            Estudiante.documento == codigo_padded,
+        )
+    ).first()
     if not estudiante:
-        raise Exception(f"Estudiante con código {data.get('codigo')} no encontrado.")
+        raise Exception(f"Estudiante con código {codigo_raw} no encontrado.")
 
     libro = db.query(InventarioLibro).filter(InventarioLibro.nombre.ilike(data.get("libro"))).first()
     if not libro:
@@ -576,7 +586,6 @@ def create_prestamo(db: Session, data: dict, current_user_name: str) -> dict:
     
     try:
         db.commit()
-        
         auditoria = Auditoria(
             tabla="prestamo_libro",
             id_registro=prestamo.id_prestamo,

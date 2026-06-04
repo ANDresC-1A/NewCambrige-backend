@@ -24,5 +24,5 @@ routers = [
     (paz_salvo_router, "/api/paz-salvo", "Paz y Salvo"),
     (secretaria_router, "/api/secretaria", "Secretaria"),
     #(rectoria_router, "/api/rectoria", "Rectoria"),
-    (parametrizacion_router, "/api/parametros", "Parametrizacion"),
+    (parametrizacion_router, "/api/parametrizacion", "Parametrizacion"),
 ]

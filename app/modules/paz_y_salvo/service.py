@@ -1,26 +1,34 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from typing import Optional, List, Set
 from app.shared.models import PeriodoAcademico, Auditoria
 from app.modules.estudiantes.models import Estudiante, EstudianteBanda
-from app.modules.paz_y_salvo.models import FirmasPazYSalvo
+from app.modules.paz_y_salvo.models import FirmasPazYSalvo, TipoFirma, DetalleFirmaPazYSalvo
 from app.modules.uniformes.models import PrestamoObjeto
 from datetime import datetime
 from app.modules.paz_y_salvo.schemas import (
     SemaforoEstado,
     DetalleFirma,
-    EstadoPazSalvoResponse,
-    EstudiantePendienteResponse,
-    FirmasBase,
+    EstudiantePendienteResponse
 )
 
-CAMPOS_FIRMAS = ["banda", "tesoreria", "uniforme", "salon", "rectoria"]
-CAMPOS_SALON = ["prueba", "pupitre", "inventario"]
+CAMPOS_FIRMAS = ["banda", "tesoreria", "uniforme", "salon", "secretaria", "rectoria"]
+
+CAMPO_TIPO_MAP = {
+    "banda": "Banda",
+    "tesoreria": "Tesorería",
+    "uniforme": "Uniforme",
+    "salon": "Salón",
+    "secretaria": "Secretaría",
+    "rectoria": "Rectoría",
+    
+}
 
 DETALLE_FIRMAS_CONFIG = [
     {"campo": "banda",      "nombre": "Banda",      "rol": "banda"},
     {"campo": "tesoreria",  "nombre": "Tesorería",  "rol": "tesoreria"},
-    {"campo": "uniforme",   "nombre": "Uniforme",   "rol": "titular"},
+    {"campo": "uniforme",   "nombre": "Uniforme",   "rol": "uniformes"},
     {"campo": "salon",      "nombre": "Salón",      "rol": "titular"},
+    {"campo": "secretaria", "nombre": "Secretaría", "rol": "secretaria"},
     {"campo": "rectoria",   "nombre": "Rectoría",   "rol": "rectoria"},
 ]
  
@@ -28,12 +36,18 @@ DETALLE_FIRMAS_CONFIG = [
 def _get_periodo_activo(db: Session) -> Optional[PeriodoAcademico]:
     return db.query(PeriodoAcademico).filter(PeriodoAcademico.activo == True).first()
 
-def _get_salon(firmas: FirmasPazYSalvo) -> bool:
-    return all(getattr(firmas, c, False) for c in CAMPOS_SALON)
+def _get_detalle(firma, tipo_nombre):
+    for d in firma.detalles:
+        if d.tipo_firma.nombre == tipo_nombre:
+            return d
+    return None
 
-def _set_salon(firmas: FirmasPazYSalvo, value: bool) ->None:
-    for c in CAMPOS_SALON:
-        setattr(firmas, c, value)
+def _get_valor_campo(firma, campo):
+    tipo_nombre = CAMPO_TIPO_MAP.get(campo)
+    if not tipo_nombre:
+        return False
+    d = _get_detalle(firma, tipo_nombre)
+    return d.estado if d else False
 
 def _get_no_aplica(db: Session, estudiante_id: int) -> set:
     no_aplica = set()
@@ -58,7 +72,7 @@ def _calcular_semaforo(firmas: FirmasPazYSalvo, no_aplica: set) -> str:
     campos_que_aplican = [c for c in CAMPOS_FIRMAS if c not in no_aplica]
     if not campos_que_aplican:
         return SemaforoEstado.VERDE
-    valores = [_get_salon(firmas) if c == "salon" else getattr(firmas, c) for c in campos_que_aplican]
+    valores = [_get_valor_campo(firmas, c) for c in campos_que_aplican]
     total_true = sum(v for v in valores if v)
     if total_true == len(campos_que_aplican):
         return SemaforoEstado.VERDE
@@ -71,8 +85,7 @@ def _construir_detalle_firmas(firmas: FirmasPazYSalvo, no_aplica: set) -> list:
     return [
         DetalleFirma(
             nombre=config["nombre"],
-            firmado= True if config["campo"] in no_aplica
-                    else (_get_salon(firmas) if config["campo"] == "salon" else getattr(firmas, config["campo"])),
+            firmado= config["campo"] in no_aplica or _get_valor_campo(firmas, config["campo"]),
             rol_responsable=config["rol"],
             no_aplica=config["campo"] in no_aplica,
         )
@@ -98,17 +111,32 @@ def get_firmas(db: Session, estudiante_id: int, periodo_id: Optional[int] = None
             return None
         periodo_id = periodo.id_periodo
     
-    firmas = db.query(FirmasPazYSalvo).filter(
+    firmas = db.query(FirmasPazYSalvo).options(
+        joinedload(FirmasPazYSalvo.detalles).joinedload(DetalleFirmaPazYSalvo.tipo_firma)
+    ).filter(
         FirmasPazYSalvo.id_estudiante == estudiante_id,
         FirmasPazYSalvo.id_periodo == periodo_id
     ).first()
     
+    if firmas and not firmas.detalles:
+        tipos = db.query(TipoFirma).all()
+        for t in tipos:
+            db.add(DetalleFirmaPazYSalvo(id_firma=firmas.id_firma, id_tipo_firma=t.id_tipo_firma, estado=False))
+        db.commit()
+        firmas = db.query(FirmasPazYSalvo).options(
+            joinedload(FirmasPazYSalvo.detalles).joinedload(DetalleFirmaPazYSalvo.tipo_firma)
+        ).filter(FirmasPazYSalvo.id_firma == firmas.id_firma).first()
+
     if not firmas:
         firmas = FirmasPazYSalvo(
             id_estudiante=estudiante_id,
             id_periodo=periodo_id
         )
         db.add(firmas)
+        db.flush()
+        tipos = db.query(TipoFirma).all()
+        for t in tipos:
+            db.add(DetalleFirmaPazYSalvo(id_firma=firmas.id_firma, id_tipo_firma=t.id_tipo_firma, estado=False))
         db.commit()
         db.refresh(firmas)
     
@@ -133,15 +161,18 @@ def get_estado_completo(db: Session, estudiante_id: int, periodo_id: Optional[in
     no_aplica = _get_no_aplica(db, estudiante_id)
     
     firmas_dict = {
-        "banda": True if "banda" in no_aplica else firmas.banda,
-        "tesoreria": firmas.tesoreria,
-        "uniforme": True if "uniforme" in no_aplica else firmas.uniforme,
-        "salon": _get_salon(firmas),
-        "rectoria": firmas.rectoria
+        "banda": True if "banda" in no_aplica else _get_valor_campo(firmas, "banda"),
+        "tesoreria": _get_valor_campo(firmas, "tesoreria"),
+        "uniforme": True if "uniforme" in no_aplica else _get_valor_campo(firmas, "uniforme"),
+        "salon": _get_valor_campo(firmas, "salon"),
+        "secretaria": _get_valor_campo(firmas, "secretaria"),
+        "rectoria": _get_valor_campo(firmas, "rectoria")
     }
     
-    todas_firmadas = all(firmas_dict.values())
-    completadas    = sum(firmas_dict.values())
+    campos_que_aplican = [c for c in CAMPOS_FIRMAS if c not in no_aplica]
+    completadas = sum(1 for c in campos_que_aplican if _get_valor_campo(firmas, c))
+    todas_firmadas = completadas == len(campos_que_aplican)
+
     
     return {
         "id_estudiante": estudiante_id,
@@ -165,87 +196,22 @@ def update_firmas(db: Session, estudiante_id: int, periodo_id: Optional[int], da
         periodo_id = periodo.id_periodo
     
     firmas = get_firmas(db, estudiante_id, periodo_id)
-    
+    no_aplica = _get_no_aplica(db, estudiante_id)
+
     for key, value in data.items():
+        if key in no_aplica:
+            if value == True:
+                raise ValueError(f"No se puede firmar '{key}' porque no aplica para este estudiante")
+            continue
         if value is not None:
-            if key == "salon":
-                _set_salon(firmas, value)
-            else:
-                setattr(firmas, key, value)
+            d = _get_detalle(firmas, CAMPO_TIPO_MAP.get(key))
+            if d:
+                d.estado = value
     
     db.commit()
     db.refresh(firmas)
     return firmas
 
-
-def get_sin_firmas(db: Session, periodo_id: Optional[int] = None) -> List[dict]:
-    if not periodo_id:
-        periodo = _get_periodo_activo(db)
-        if not periodo:
-            return []
-        periodo_id = periodo.id_periodo
-    
-    estudiantes = db.query(Estudiante).all()
-    resultado = []
-    
-    for e in estudiantes:
-        firmas = db.query(FirmasPazYSalvo).filter(
-            FirmasPazYSalvo.id_estudiante == e.id_estudiante,
-            FirmasPazYSalvo.id_periodo == periodo_id
-        ).first()
-        
-        no_aplica = _get_no_aplica(db, e.id_estudiante)
-
-        if not firmas:
-            faltantes_reales = [c for c in CAMPOS_FIRMAS if c not in no_aplica]
-            resultado.append({"id_estudiante": e.id_estudiante, "nombre": e.nombre, "faltan": faltantes_reales})
-        else:
-            faltantes = []
-            if not firmas.banda and "banda" not in no_aplica: faltantes.append("banda")
-            if not firmas.tesoreria and "tesoreria" not in no_aplica: faltantes.append("tesoreria")
-            if not firmas.uniforme and "uniforme" not in no_aplica: faltantes.append("uniforme")
-            if not _get_salon(firmas) and "salon" not in no_aplica: faltantes.append("salon")
-            if not firmas.rectoria and "rectoria" not in no_aplica: faltantes.append("rectoria")
-            if faltantes:
-                resultado.append({"id_estudiante": e.id_estudiante, "nombre": e.nombre, "faltan": faltantes})
-    
-    return resultado
-
-
-def actualizar_firma(db: Session, estudiante_id: int, data: dict, usuario_nombre: str, periodo_id: Optional[int] = None) -> Optional[FirmasPazYSalvo]:
-    estudiante = db.query(Estudiante).filter(Estudiante.id_estudiante == estudiante_id).first()
-    if not estudiante:
-        return None
-
-    if not periodo_id:
-        periodo = _get_periodo_activo(db)
-        if not periodo:
-            return None
-        periodo_id = periodo.id_periodo
-
-    firmas = get_firmas(db, estudiante_id, periodo_id)
-
-    campos_actualizados = []
-    for campo, valor in data.items():
-        if valor is not None:
-            if campo == "salon":
-                _set_salon(firmas, valor)
-                campos_actualizados.append(f"{campo}={valor}")
-            elif hasattr(firmas, campo):
-                setattr(firmas, campo, valor)
-                campos_actualizados.append(f"{campo}={valor}")
-
-    _registrar_auditoria(
-        db=db,
-        usuario=usuario_nombre,
-        accion=f"FIRMA: {', '.join(campos_actualizados)}"[:50],
-        tabla="firmas_paz_y_salvo",
-        id_registro=firmas.id_firma,
-    )
-
-    db.commit()
-    db.refresh(firmas)
-    return firmas
 
 
 def firmar_rectoria(db: Session, estudiante_id: int, usuario_nombre: str, periodo_id: Optional[int] = None) -> dict:
@@ -262,14 +228,15 @@ def firmar_rectoria(db: Session, estudiante_id: int, usuario_nombre: str, period
     firmas = get_firmas(db, estudiante_id, periodo_id)
     no_aplica = _get_no_aplica(db, estudiante_id)
 
-    firmas_previas = ["banda", "tesoreria", "uniforme", "salon"]
+    firmas_previas = ["banda", "tesoreria", "uniforme", "salon", "secretaria"]
     nombres_display = {
         "banda": "Banda",
         "tesoreria":  "Tesorería",
         "uniforme":   "Uniforme",
         "salon":      "Salón",
+        "secretaria": "Secretaría",
     }
-    faltantes = [c for c in firmas_previas if not (_get_salon(firmas) if c == "salon" else getattr(firmas, c)) and c not in no_aplica]
+    faltantes = [c for c in firmas_previas if not _get_valor_campo(firmas, c) and c not in no_aplica]
 
     if faltantes:
         return {
@@ -277,10 +244,12 @@ def firmar_rectoria(db: Session, estudiante_id: int, usuario_nombre: str, period
             "codigo": 400,
         }
 
-    if firmas.rectoria:
+    d_rect = _get_detalle(firmas, "Rectoría")
+    if not d_rect:
+        return {"error": "Error interno", "codigo": 500}
+    if d_rect.estado:
         return {"error": "Este estudiante ya tiene la firma de Rectoría.", "codigo": 400}
-
-    firmas.rectoria = True
+    d_rect.estado = True
 
     _registrar_auditoria(
         db=db,
@@ -314,7 +283,7 @@ def get_pendientes(db: Session, periodo_id: Optional[int] = None) -> List[dict]:
     for estudiante in estudiantes:
         firmas = get_firmas(db, estudiante.id_estudiante, periodo_id)
         no_aplica = _get_no_aplica(db, estudiante.id_estudiante)
-        faltantes = [c for c in CAMPOS_FIRMAS if not (_get_salon(firmas) if c == "salon" else getattr(firmas, c)) and c not in no_aplica]
+        faltantes = [c for c in CAMPOS_FIRMAS if not _get_valor_campo(firmas, c) and c not in no_aplica]
 
         if faltantes:
             campos_aplican = [c for c in CAMPOS_FIRMAS if c not in no_aplica]

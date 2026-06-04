@@ -29,6 +29,7 @@ def listar_usuarios(
             "id_usuario": u.id_usuario,
             "nombre": u.nombre,
             "estado": u.estado,
+            "documento": u.documento,
             "created_at": u.created_at,
             "roles": roles
         })
@@ -63,8 +64,8 @@ def crear_usuario(
     return {
         "id_usuario": usuario.id_usuario,
         "nombre": usuario.nombre,
-        "documento": usuario.documento,
         "estado": usuario.estado,
+        "documento": usuario.documento,
         "created_at": usuario.created_at,
         "roles": roles
     }
@@ -86,6 +87,7 @@ def actualizar_usuario(
         "id_usuario": usuario.id_usuario,
         "nombre": usuario.nombre,
         "estado": usuario.estado,
+        "documento": usuario.documento,
         "created_at": usuario.created_at,
         "roles": roles
     }
@@ -150,6 +152,7 @@ def asignar_roles_usuario(
         "id_usuario": usuario.id_usuario,
         "nombre": usuario.nombre,
         "estado": usuario.estado,
+        "documento": usuario.documento,
         "created_at": usuario.created_at,
         "roles": roles
     }

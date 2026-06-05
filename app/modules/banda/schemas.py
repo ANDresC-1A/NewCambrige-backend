@@ -36,11 +36,10 @@ class UbicacionResponse(UbicacionBase):
 
 # ============ INSTRUMENTOS ============
 class InstrumentoBase(BaseModel):
-    codigo:int
     nombre: str
     id_categoria: Optional[int] = None
     id_ubicacion: Optional[int] = None
-    cantidad_total:int = Field(ge=1)
+    cantidad_total:int = Field(ge=0)
     estado:str = "activo"
     
 class InstrumentoCreate(InstrumentoBase):
@@ -50,7 +49,7 @@ class InstrumentoUpdate(BaseModel):
     nombre: Optional[str] = None
     id_categoria: Optional[int] = None
     id_ubicacion: Optional[int] = None
-    cantidad_total: Optional[int] = Field(None, ge=1)
+    cantidad_total: Optional[int] = Field(None, ge=0)
     estado: Optional[str] = None
 
 class InstrumentoResponse(InstrumentoBase):
@@ -94,6 +93,10 @@ class PrestamoInstrumentoResponse(PrestamoInstrumentoBase):
     updated_at: datetime
     instrumento_nombre: Optional[str] = None
     estudiante_nombre: Optional[str] = None
+    
+    estudiante_documento: Optional[str] = None
+    estudiante_grado: Optional[str] = None
+    estudiante_grupo: Optional[str] = None
     
     class Config:
         from_attributes = True

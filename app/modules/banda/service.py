@@ -124,29 +124,19 @@ def get_instrumento_by_id(db: Session, instrumento_id: int) -> Optional[Inventar
     return db.query(InventarioInstrumento).options(
         joinedload(InventarioInstrumento.categoria),
         joinedload(InventarioInstrumento.ubicacion)
-    ).filter(InventarioInstrumento.id_instrumento == instrumento_id).first()
+    ).filter(InventarioInstrumento.id_instrumento == instrumento_id).first() # Corregido
 
 def create_instrumento(db: Session, data: dict, current_user) -> InventarioInstrumento:
-    existente = db.query(InventarioInstrumento).filter(InventarioInstrumento.codigo == data["codigo"]).first()
-    if existente:
-        raise ValueError("El código del instrumento ya se encuentra registrado.")
-    
     data["cantidad_disponible"] = data["cantidad_total"]
     nuevo = InventarioInstrumento(**data)
     db.add(nuevo)
+    db.flush() 
     
     registrar_auditoria(
-        db, 
-        current_user, 
-        "Inventario", 
-        "Instrumento registrado", 
-        f"{data['codigo']} - {data['nombre']}", 
-        "—", 
-        str(data["cantidad_total"]), 
-        "EXITOSO", 
-        "Se registró un nuevo instrumento."
+        db, current_user, "Inventario", "Instrumento registrado", 
+        f"ID: {nuevo.id_instrumento} - {nuevo.nombre}", # Corregido
+        "—", str(data["cantidad_total"]), "EXITOSO", "Se registró un nuevo instrumento."
     )
-    
     db.commit()
     db.refresh(nuevo)
     return nuevo
@@ -165,11 +155,14 @@ def update_instrumento(db: Session, instrumento_id: int, data: dict, current_use
             raise ValueError("La cantidad total no puede ser menor a los instrumentos actualmente prestados.")
             
     for key, value in data.items():
-        if value is not None and key != "codigo":
+        # ✅ CORREGIDO: Evitamos actualizar id_instrumento o el antiguo codigo
+        if value is not None and key not in ["id_instrumento", "id_inventario", "codigo"]:
             setattr(instrumento, key, value)
             
     valor_nuevo = f"Total: {instrumento.cantidad_total}, Estado: {instrumento.estado}"
-    registrar_auditoria(db, current_user, "Inventario", "Instrumento editado", f"{instrumento.codigo} - {instrumento.nombre}", valor_anterior, valor_nuevo, "EXITOSO", "Se editó el instrumento.")
+    
+    # ✅ CORREGIDO: Usamos id_instrumento
+    registrar_auditoria(db, current_user, "Inventario", "Instrumento editado", f"ID: {instrumento.id_instrumento} - {instrumento.nombre}", valor_anterior, valor_nuevo, "EXITOSO", "Se editó el instrumento.")
     
     db.commit()
     db.refresh(instrumento)
@@ -183,32 +176,47 @@ def delete_instrumento(db: Session, instrumento_id: int, current_user) -> bool:
     if instrumento.cantidad_disponible < instrumento.cantidad_total:
         raise ValueError("No es posible eliminar este instrumento. Tiene asignaciones activas.")
     
-    registrar_auditoria(db, current_user, "Inventario", "Instrumento eliminado", f"{instrumento.codigo} - {instrumento.nombre}", "Activo", "Eliminado", "EXITOSO", "Se eliminó el instrumento del sistema.")
+    # ✅ CORREGIDO: Usamos id_instrumento
+    registrar_auditoria(db, current_user, "Inventario", "Instrumento eliminado", f"ID: {instrumento.id_instrumento} - {instrumento.nombre}", "Activo", "Eliminado", "EXITOSO", "Se eliminó el instrumento.")
     
     db.delete(instrumento)
     db.commit()
     return True
 
 # ============ PRÉSTAMOS DE INSTRUMENTOS ============
-def get_prestamos_all(
-    db: Session, 
-    skip: int = 0, 
-    limit: int = 100,
-    solo_activos: bool = False,
-    estudiante_id: Optional[int] = None
-) -> List[PrestamoInstrumento]:
+def get_prestamos_all(db: Session, skip: int = 0, limit: int = 100, solo_activos: bool = False, estudiante_id: Optional[int] = None) -> List[dict]:
+    # ✅ Hacemos el join con Estudiante y Salon para traer Grado/Grupo
     query = db.query(PrestamoInstrumento).options(
         joinedload(PrestamoInstrumento.instrumento),
-        joinedload(PrestamoInstrumento.estudiante)
+        joinedload(PrestamoInstrumento.estudiante).joinedload(Estudiante.salon) 
     )
     
     if solo_activos:
         query = query.filter(PrestamoInstrumento.estado_entrega == "prestado")
     
-    if estudiante_id:
-        query = query.filter(PrestamoInstrumento.id_estudiante == estudiante_id)
+    prestamos = query.order_by(PrestamoInstrumento.fecha_prestamo.desc()).offset(skip).limit(limit).all()
     
-    return query.order_by(PrestamoInstrumento.fecha_prestamo.desc()).offset(skip).limit(limit).all()
+    # ✅ Mapeamos manualmente para que el Front reciba los nombres exactos que espera
+    resultado = []
+    for p in prestamos:
+        resultado.append({
+            "id_prestamo": p.id_prestamo,
+            "id_instrumento": p.id_instrumento,
+            "id_estudiante": p.id_estudiante,
+            "fecha_prestamo": p.fecha_prestamo,
+            "fecha_devolucion": p.fecha_devolucion,
+            "estado_entrega": p.estado_entrega,
+            "estado_al_devolver": p.estado_al_devolver,
+            "observacion": p.observacion,
+            "created_at": p.created_at,
+            "updated_at": p.updated_at,
+            "instrumento_nombre": p.instrumento.nombre if p.instrumento else "N/A",
+            "estudiante_nombre": p.estudiante.nombre if p.estudiante else "N/A",
+            "estudiante_documento": p.estudiante.documento if p.estudiante else "N/A",
+            "estudiante_grado": p.estudiante.salon.grado if p.estudiante and p.estudiante.salon else "N/A",
+            "estudiante_grupo": p.estudiante.salon.grupo if p.estudiante and p.estudiante.salon else "N/A",
+        })
+    return resultado
 
 def get_prestamo_by_id(db: Session, prestamo_id: int) -> Optional[PrestamoInstrumento]:
     return db.query(PrestamoInstrumento).options(
@@ -253,8 +261,7 @@ def create_prestamo(db: Session, data: dict, current_user) -> Optional[PrestamoI
     instrumento.cantidad_disponible -= 1
     
     db.add(prestamo)
-    registrar_auditoria(db, current_user, "Asignaciones", "Asignación creada", f"Inst: {instrumento.codigo}, Est: {estudiante.nombre}", "—", "Prestado", "EXITOSO", "Se asignó un instrumento al estudiante.")
-    
+    registrar_auditoria(db, current_user, "Asignaciones", "Asignación creada", f"Inst ID: {instrumento.id_instrumento}, Est: {estudiante.nombre}", "—", "Prestado", "EXITOSO", "Se asignó un instrumento.")
     db.commit()
     db.refresh(prestamo)
     return prestamo
@@ -289,10 +296,9 @@ def devolver_instrumento(db: Session, prestamo_id: int, data: dict, current_user
             instrumento.estado = "En mantenimiento"
             
     registrar_auditoria(db, current_user, "Devoluciones", "Devolución registrada", 
-                        f"Inst: {instrumento.codigo}, Est: {prestamo.estudiante.nombre}", 
+                        f"Inst ID: {instrumento.id_instrumento}, Est: {prestamo.estudiante.nombre}", 
                         "Prestado", f"Devuelto ({estado_devolucion})", "EXITOSO", 
                         "Se registró la devolución del instrumento.")
-    
     db.commit()
     db.refresh(prestamo)
     return prestamo

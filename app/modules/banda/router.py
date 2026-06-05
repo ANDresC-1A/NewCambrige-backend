@@ -80,7 +80,6 @@ def listar_instrumentos(
     for i in instrumentos:
         resultado.append({
             "id_instrumento": i.id_instrumento,
-            "codigo": i.codigo,
             "nombre": i.nombre,
             "id_categoria": i.id_categoria,
             "id_ubicacion": i.id_ubicacion,
@@ -98,7 +97,7 @@ def instrumentos_disponibles(db: Session = Depends(get_db), current_user = Depen
     return [
         {
             "id_instrumento": i.id_instrumento,
-            "codigo": i.codigo,
+            "codigo": i.id_instrumento,
             "nombre": i.nombre,
             "cantidad_disponible": i.cantidad_disponible,
             "categoria": i.categoria.nombre if i.categoria else None,
@@ -114,7 +113,7 @@ def obtener_instrumento(instrumento_id: int, db: Session = Depends(get_db), curr
         raise HTTPException(status_code=404, detail="Instrumento no encontrado")
     return {
         "id_instrumento": instrumento.id_instrumento,
-        "codigo": instrumento.codigo,
+        "codigo": instrumento.id_instrumento, # MAPEADO
         "nombre": instrumento.nombre,
         "id_categoria": instrumento.id_categoria,
         "id_ubicacion": instrumento.id_ubicacion,
@@ -124,7 +123,7 @@ def obtener_instrumento(instrumento_id: int, db: Session = Depends(get_db), curr
         "categoria_nombre": instrumento.categoria.nombre if instrumento.categoria else None,
         "ubicacion_nombre": instrumento.ubicacion.nombre if instrumento.ubicacion else None
     }
-
+    
 @router.post("/instrumentos", response_model=InstrumentoResponse, status_code=status.HTTP_201_CREATED)
 def crear_instrumento(data: InstrumentoCreate, db: Session = Depends(get_db), current_user = Depends(require_roles(["admin", "banda"]))):
     try:
@@ -157,24 +156,8 @@ def listar_prestamos(
     solo_activos: bool = Query(False), estudiante_id: Optional[int] = Query(None),
     db: Session = Depends(get_db), current_user = Depends(require_roles(["admin", "banda", "secretaria"]))
 ):
-    prestamos = service.get_prestamos_all(db, skip, limit, solo_activos, estudiante_id)
-    resultado = []
-    for p in prestamos:
-        resultado.append({
-            "id_prestamo": p.id_prestamo,
-            "id_instrumento": p.id_instrumento,
-            "id_estudiante": p.id_estudiante,
-            "fecha_prestamo": p.fecha_prestamo,
-            "fecha_devolucion": p.fecha_devolucion,
-            "estado_entrega": p.estado_entrega,
-            "estado_al_devolver": p.estado_al_devolver,
-            "observacion": p.observacion,
-            "created_at": p.created_at,
-            "updated_at": p.updated_at,
-            "instrumento_nombre": p.instrumento.nombre if p.instrumento else None,
-            "estudiante_nombre": p.estudiante.nombre if p.estudiante else None
-        })
-    return resultado
+    # ✅ El service ya devuelve la lista de diccionarios formateada correctamente
+    return service.get_prestamos_all(db, skip, limit, solo_activos, estudiante_id)
 
 @router.get("/prestamos/activos", response_model=List[PrestamoActivoResponse])
 def prestamos_activos(db: Session = Depends(get_db), current_user = Depends(require_roles(["admin", "banda", "secretaria"]))):

@@ -77,6 +77,7 @@ class AsignacionResponse(BaseModel):
     estado: Optional[str] = None
     estado_original: Optional[str] = None
     talla: Optional[str] = None  # Se añade explícitamente ya que tu servicio lo incluye en el diccionario de salida
+    estado_entrega: Optional[str] = None
 
     class Config:
         from_attributes = True

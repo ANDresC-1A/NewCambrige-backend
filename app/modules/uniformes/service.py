@@ -403,7 +403,13 @@ def get_asignaciones(db: Session, id_usuario: int, roles: list):
             "estado":
                 prestamo.estado_prestamo
                 if prestamo
-                else "Sin asignar"
+                else "Sin asignar",
+
+            "talla":
+                prestamo.talla if prestamo else "",
+
+            "estado_entrega":
+                prestamo.estado_entrega if prestamo else ""
         })
         
 

@@ -7,16 +7,48 @@ from app.modules.importacion.schemas import (
     CargaMasivaRequest, 
     CargaIndividualRequest, 
     EjecucionBotResponse, 
-    SincronizarRequest
+    SincronizarRequest,
+    CredencialesResponse,
+    CredencialesUpdate
 )
 from app.modules.importacion.service import ImportacionService
 from app.modules.auth.deps import require_roles
 from app.modules.usuarios.models import Usuario
+from app.modules.secretaria.models import CredencialesLogin
+from app.core.security import encriptar_texto
 
 router = APIRouter()
 
 def get_importacion_service(db: Session = Depends(get_db)):
     return ImportacionService(db)
+
+@router.get("/credenciales", response_model=CredencialesResponse, summary="Obtiene las credenciales del robot scraper")
+def obtener_credenciales(
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_roles(["admin"]))
+):
+    credencial = db.query(CredencialesLogin).first()
+    if not credencial:
+        raise HTTPException(status_code=404, detail="No hay credenciales configuradas")
+    return credencial
+
+@router.put("/credenciales", response_model=CredencialesResponse, summary="Actualiza las credenciales del robot scraper")
+def actualizar_credenciales(
+    datos: CredencialesUpdate,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_roles(["admin"]))
+):
+    credencial = db.query(CredencialesLogin).first()
+    if not credencial:
+        credencial = CredencialesLogin()
+        db.add(credencial)
+    
+    credencial.url = datos.url
+    credencial.nombre_usuario = datos.nombre_usuario
+    credencial.password_hash = encriptar_texto(datos.password)
+    db.commit()
+    db.refresh(credencial)
+    return credencial
 
 @router.post("/scraping", summary="Inicia el scraping desde WebColegios")
 def iniciar_scraping(
@@ -91,3 +123,14 @@ def sincronizar_docentes(
     current_user: Usuario = Depends(require_roles(["admin"]))
 ):
     return service.sincronizar_docentes(ejecucion_id=request.ejecucion_id)
+
+@router.delete("/scraping/cancelar/{ejecucion_id}", summary="Cancela la sincronización y purga staging")
+def cancelar_scraping(
+    ejecucion_id: int,
+    tipo: str,
+    service: ImportacionService = Depends(get_importacion_service),
+    current_user: Usuario = Depends(require_roles(["admin"]))
+):
+    if tipo not in ["estudiante", "docente"]:
+        raise HTTPException(status_code=400, detail="El tipo debe ser 'estudiante' o 'docente'")
+    return service.cancelar_sincronizacion(ejecucion_id=ejecucion_id, tipo=tipo)

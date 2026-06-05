@@ -8,6 +8,7 @@ class EstudianteImportBase(BaseModel):
     grado: Optional[str] = Field(None, max_length=100)
     curso: Optional[str] = Field(None, max_length=100)
     jornada: Optional[str] = Field(None, max_length=100)
+    observaciones: Optional[str] = Field(None)
 
 class DocenteImportBase(BaseModel):
     documento: Optional[str] = Field(None, max_length=100)
@@ -39,3 +40,16 @@ class EjecucionBotResponse(BaseModel):
 
 class SincronizarRequest(BaseModel):
     ejecucion_id: int
+
+class CredencialesResponse(BaseModel):
+    url: str
+    nombre_usuario: str
+    password_hash: str
+    
+    class Config:
+        from_attributes = True
+
+class CredencialesUpdate(BaseModel):
+    url: str
+    nombre_usuario: str
+    password: str

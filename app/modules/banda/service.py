@@ -173,6 +173,10 @@ def delete_instrumento(db: Session, instrumento_id: int, current_user) -> bool:
     if not instrumento:
         return False
     
+    tiene_historial = db.query(PrestamoInstrumento).filter(PrestamoInstrumento.id_instrumento == instrumento_id).first()
+    if tiene_historial:
+        raise ValueError("No es posible eliminar este instrumento. Tiene historial de préstamos vincuados.")
+    
     if instrumento.cantidad_disponible < instrumento.cantidad_total:
         raise ValueError("No es posible eliminar este instrumento. Tiene asignaciones activas.")
     

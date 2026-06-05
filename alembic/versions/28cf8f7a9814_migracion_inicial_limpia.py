@@ -1,8 +1,8 @@
-"""correccion por doble cabecera
+"""migracion_inicial_limpia
 
-Revision ID: 87f7e0f17fbd
+Revision ID: 28cf8f7a9814
 Revises: 
-Create Date: 2026-05-28 20:49:32.772967
+Create Date: 2026-06-04 13:26:23.530505
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '87f7e0f17fbd'
+revision: str = '28cf8f7a9814'
 down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -33,6 +33,22 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('id_auditoria')
     )
     op.create_index(op.f('ix_auditoria_id_auditoria'), 'auditoria', ['id_auditoria'], unique=False)
+    op.create_table('auditoria_banda',
+    sa.Column('id_auditoria', sa.Integer(), nullable=False),
+    sa.Column('fecha', sa.Date(), nullable=True),
+    sa.Column('hora', sa.TIMESTAMP(timezone=True), server_default=sa.text('now()'), nullable=True),
+    sa.Column('id_usuario', sa.Integer(), nullable=False),
+    sa.Column('nombre_usuario', sa.String(length=200), nullable=False),
+    sa.Column('modulo_origen', sa.String(length=100), nullable=False),
+    sa.Column('tipo_accion', sa.String(length=100), nullable=False),
+    sa.Column('entidad_afectada', sa.String(length=300), nullable=False),
+    sa.Column('valor_anterior', sa.String(length=200), nullable=True),
+    sa.Column('valor_nuevo', sa.String(length=200), nullable=True),
+    sa.Column('resultado', sa.String(length=50), nullable=False),
+    sa.Column('descripcion', sa.Text(), nullable=False),
+    sa.PrimaryKeyConstraint('id_auditoria')
+    )
+    op.create_index(op.f('ix_auditoria_banda_id_auditoria'), 'auditoria_banda', ['id_auditoria'], unique=False)
     op.create_table('categoria',
     sa.Column('id_categoria', sa.Integer(), nullable=False),
     sa.Column('nombre', sa.String(length=100), nullable=False),
@@ -115,6 +131,7 @@ def upgrade() -> None:
     op.create_table('usuario',
     sa.Column('id_usuario', sa.Integer(), nullable=False),
     sa.Column('nombre', sa.String(length=100), nullable=False),
+    sa.Column('documento', sa.String(length=10), nullable=False),
     sa.Column('estado', sa.Boolean(), nullable=False),
     sa.Column('contrasena', sa.String(length=255), nullable=False),
     sa.Column('created_at', sa.TIMESTAMP(timezone=True), server_default=sa.text('now()'), nullable=True),
@@ -123,13 +140,17 @@ def upgrade() -> None:
     op.create_index(op.f('ix_usuario_id_usuario'), 'usuario', ['id_usuario'], unique=False)
     op.create_table('inventario_instrumento',
     sa.Column('id_instrumento', sa.Integer(), nullable=False),
+    sa.Column('codigo', sa.Integer(), nullable=False),
     sa.Column('nombre', sa.String(length=100), nullable=False),
     sa.Column('id_categoria', sa.Integer(), nullable=True),
     sa.Column('id_ubicacion', sa.Integer(), nullable=True),
-    sa.Column('disponible', sa.Boolean(), nullable=True),
+    sa.Column('cantidad_total', sa.Integer(), nullable=False),
+    sa.Column('cantidad_disponible', sa.Integer(), nullable=False),
+    sa.Column('estado', sa.String(length=50), nullable=False),
     sa.ForeignKeyConstraint(['id_categoria'], ['categoria.id_categoria'], ),
     sa.ForeignKeyConstraint(['id_ubicacion'], ['ubicacion.id_ubicacion'], ),
-    sa.PrimaryKeyConstraint('id_instrumento')
+    sa.PrimaryKeyConstraint('id_instrumento'),
+    sa.UniqueConstraint('codigo')
     )
     op.create_index(op.f('ix_inventario_instrumento_id_instrumento'), 'inventario_instrumento', ['id_instrumento'], unique=False)
     op.create_table('responsable_firma',
@@ -150,8 +171,8 @@ def upgrade() -> None:
     op.create_table('salon',
     sa.Column('id_salon', sa.Integer(), nullable=False),
     sa.Column('id_usuario', sa.Integer(), nullable=True),
-    sa.Column('grado', sa.Integer(), nullable=False),
-    sa.Column('grupo', sa.Integer(), nullable=False),
+    sa.Column('grado', sa.String(length=10), nullable=False),
+    sa.Column('grupo', sa.String(length=2), nullable=False),
     sa.Column('id_periodo', sa.Integer(), nullable=True),
     sa.ForeignKeyConstraint(['id_periodo'], ['periodo_academico.id_periodo'], ),
     sa.ForeignKeyConstraint(['id_usuario'], ['usuario.id_usuario'], ),
@@ -231,6 +252,7 @@ def upgrade() -> None:
     sa.Column('fecha_prestamo', sa.Date(), nullable=True),
     sa.Column('fecha_devolucion', sa.Date(), nullable=True),
     sa.Column('estado_entrega', sa.String(length=20), nullable=True),
+    sa.Column('estado_al_devolver', sa.String(length=50), nullable=True),
     sa.Column('observacion', sa.String(length=255), nullable=True),
     sa.Column('created_at', sa.TIMESTAMP(timezone=True), server_default=sa.text('now()'), nullable=True),
     sa.Column('updated_at', sa.TIMESTAMP(timezone=True), server_default=sa.text('now()'), nullable=True),
@@ -384,6 +406,8 @@ def downgrade() -> None:
     op.drop_table('credenciales_login')
     op.drop_index(op.f('ix_categoria_id_categoria'), table_name='categoria')
     op.drop_table('categoria')
+    op.drop_index(op.f('ix_auditoria_banda_id_auditoria'), table_name='auditoria_banda')
+    op.drop_table('auditoria_banda')
     op.drop_index(op.f('ix_auditoria_id_auditoria'), table_name='auditoria')
     op.drop_table('auditoria')
     # ### end Alembic commands ###

@@ -14,24 +14,6 @@ class FirmasBase(BaseModel):
     salon: bool = False
     secretaria: bool = False
     rectoria: bool = False
-    
-
-class FirmasUpdate(BaseModel):
-    banda: Optional[bool] = None
-    tesoreria: Optional[bool] = None
-    uniforme: Optional[bool] = None
-    salon: Optional[bool] = None
-    secretaria: Optional[bool] = None
-
-class FirmasResponse(FirmasBase):
-    id_firma: int
-    id_estudiante: int
-    id_periodo: int
-    updated_at: Optional[datetime] = None
-    
-    class Config:
-        from_attributes = True
-
 
 class DetalleFirma(BaseModel):
     nombre: str
@@ -42,6 +24,7 @@ class DetalleFirma(BaseModel):
 class EstadoPazSalvoResponse(BaseModel):
     id_estudiante: int
     nombre: str
+    documento: Optional[str] = None
     id_periodo: int
     periodo_nombre: Optional[str] = None
     firmas: FirmasBase
@@ -69,3 +52,34 @@ class EstudiantePendienteResponse(BaseModel):
 
 class RectoriaFirmaRequest(BaseModel):
     observacion: Optional[str] = None
+
+
+class EstudianteRectoriaItem(BaseModel):
+    id_estudiante: int
+    nombre: str
+    documento: str
+    grado: Optional[str]
+    grupo: Optional[str]
+    salon: str
+    semaforo: str
+    firmas_completadas: int
+    total_firmas: int
+    todas_firmadas: bool
+    puede_retirarse: bool
+
+class DocenteRectoriaItem(BaseModel):
+    id_docente: int
+    nombre: str
+    documento: str
+    grado: Optional[str] = None
+    grupo: Optional[str] = None
+    salon: Optional[str] = None
+    firmado: bool = False
+    fecha_firma: Optional[datetime] = None
+
+class DocenteRectoriaFirmaResponse(BaseModel):
+    mensaje: str
+    id_docente: int
+    nombre_docente: str
+    firmado: bool
+    fecha_firma: datetime

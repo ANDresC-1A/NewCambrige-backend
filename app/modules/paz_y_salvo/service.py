@@ -13,7 +13,6 @@ from datetime import datetime
 import hashlib, os
 
 SELLO_PATH = "app/modules/paz_y_salvo/sellos/sello.jpeg"
-SELLO_HASH_PATH = "app/modules/paz_y_salvo/sellos/sello.jpeg.hash"
 
 CAMPOS_FIRMAS = ["banda", "tesoreria", "uniforme", "salon", "secretaria", "rectoria"]
 
@@ -230,20 +229,23 @@ def firmar_rectoria(db: Session, estudiante_id: int, usuario_nombre: str, period
     no_aplica = _get_no_aplica(db, estudiante_id)
 
     firmas_previas = ["banda", "tesoreria", "uniforme", "salon", "secretaria"]
-    nombres_display = {
-        "banda": "Banda",
-        "tesoreria":  "Tesorería",
-        "uniforme":   "Uniforme",
-        "salon":      "Salón",
-        "secretaria": "Secretaría",
-    }
-    faltantes = [c for c in firmas_previas if not _get_valor_auto(firmas, c, db, estudiante_id, periodo_id) and c not in no_aplica]
+    modulos_autocompletados = []
+    for campo in firmas_previas:
+        tipo_nombre = CAMPO_TIPO_MAP.get(campo)
+        d = _get_detalle(firmas, tipo_nombre)
+        if d and not d.estado:
+            d.estado = True
+            if usuario_id:
+                d.id_usuario_firmante = usuario_id
+            modulos_autocompletados.append(campo)
 
-    if faltantes:
-        return {
-            "error": f"No se puede firmar. Hay módulos pendientes: {', '.join(nombres_display[f] for f in faltantes)}",
-            "codigo": 400,
-        }
+    if modulos_autocompletados:
+        _registrar_auditoria(
+            db=db, usuario=usuario_nombre,
+            accion="FIRMA_RECTORIA_AUTOCOMPLETE",
+            tabla="firmas_paz_y_salvo",
+            id_registro=firmas.id_firma,
+        )
 
     d_rect = _get_detalle(firmas, "Rectoría")
     if not d_rect:
@@ -403,8 +405,18 @@ def _auto_salon(db: Session, estudiante_id: int) -> bool:
         return False
     return True
     
-def _auto_secretaria(db: Session, estudiante_id: int) -> bool:
-    return True
+def _auto_secretaria(db: Session, estudiante_id: int, periodo_id: int) -> bool:
+    matricula = db.query(Matricula).filter(
+        Matricula.id_estudiante == estudiante_id,
+        Matricula.id_periodo == periodo_id
+    ).first()
+    if not matricula:
+        return False
+    pendiente = db.query(DetalleMatricula).filter(
+        DetalleMatricula.id_matricula == matricula.id_matricula,
+        DetalleMatricula.estado == "Pendiente"
+    ).first()
+    return pendiente is None
 
 def _get_valor_auto(firma: FirmasPazYSalvo, campo: str, db: Session, estudiante_id: int, periodo_id: int) -> bool:
     if _get_valor_campo(firma, campo):
@@ -419,7 +431,7 @@ def _get_valor_auto(firma: FirmasPazYSalvo, campo: str, db: Session, estudiante_
     elif campo == "salon":
         return _auto_salon(db, estudiante_id)
     elif campo == "secretaria":
-        return _auto_secretaria(db, estudiante_id)
+        return _auto_secretaria(db, estudiante_id, periodo_id)
     return False
 
 def listar_estudiantes_para_rectoria(db: Session, periodo_id: int, grado: Optional[str] = None, semaforo: Optional[str] = None, nombre: Optional[str] = None, documento: Optional[str] = None, grupo: Optional[str] = None,) -> list:
@@ -529,7 +541,9 @@ def listar_estudiantes_para_rectoria(db: Session, periodo_id: int, grado: Option
             if campo == "salon":
                 return e.id_estudiante not in ids_pruebas and e.id_estudiante not in ids_pupitres and e.id_estudiante not in ids_libros
             if campo == "secretaria":
-                return True
+                if e.id_estudiante not in ids_matriculados:
+                    return False
+                return e.id_estudiante not in pendientes_tesoreria
             return False
         
         firmas_dict = {c: valor_firma(c) for c in CAMPOS_FIRMAS}
@@ -691,14 +705,12 @@ def descargar_pdf_docente(db: Session, docente_id: int, periodo_id: int) -> byte
     sello_path = "app/modules/paz_y_salvo/sellos/sello.jpeg"
     return generar_pdf_paz_salvo(data, "docente", sello_path)
 
-def descargar_pdf_estudiantes_batch(
-    db: Session, periodo_id: int, grado: str, grupo: str
-) -> bytes:
+def descargar_pdf_estudiantes_batch(db: Session, periodo_id: int, grado: str, grupo: str) -> bytes:
     import io, zipfile
 
-    estudiantes = listar_estudiantes_para_rectoria(
-        db, periodo_id, grado=grado, grupo=grupo
-    )
+    estudiantes = listar_estudiantes_para_rectoria(db, periodo_id, grado=grado, grupo=grupo)
+
+    estudiantes = [e for e in estudiantes if e.get("todas_firmadas")]
 
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:

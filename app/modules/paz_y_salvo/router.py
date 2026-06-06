@@ -1,10 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import Optional, List
 from app.core.database import get_db
 from app.shared.models import PeriodoAcademico
 from app.modules.paz_y_salvo import service
-from app.modules.paz_y_salvo.schemas import EstadoPazSalvoResponse, RectoriaFirmaRequest, RectoriaFirmaResponse, EstudiantePendienteResponse, EstudianteRectoriaItem, DocenteRectoriaItem, DocenteRectoriaFirmaResponse
+from app.modules.paz_y_salvo.schemas import EstadoPazSalvoResponse, RectoriaFirmaRequest, RectoriaFirmaResponse, EstudianteRectoriaItem, DocenteRectoriaItem, DocenteRectoriaFirmaResponse
 from app.modules.auth.deps import require_roles
 from app.modules.usuarios.models import Usuario, RolUsuario, Rol
 from fastapi.responses import FileResponse, StreamingResponse
@@ -113,7 +113,7 @@ def firmar_rectoria(
     periodo_id: Optional[int] = Query(None),
     body: Optional[RectoriaFirmaRequest] = None,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_roles(["admin", "rectoria"])),
+    current_user: Usuario = Depends(require_roles(["admin", "secretaria", "rectoria"])),
 ):
     periodo_id_validado = _validar_acceso_periodo(periodo_id, current_user, db)
     resultado = service.firmar_rectoria(
@@ -159,25 +159,6 @@ def listar_periodos(
         for p in periodos
     ]
 
-@router.get("/pendientes", response_model=List[EstudiantePendienteResponse], summary="Estudiantes con paz y salvo pendiente")
-def listar_pendientes(
-    periodo_id: Optional[int] = Query(None),
-    db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_roles(["admin", "secretaria", "rectoria"])),
-):
-    return service.get_pendientes(db, periodo_id)
-
-@router.get("/titular/pendientes")
-def titular_pendientes(
-    periodo_id: Optional[int] = Query(None),
-    db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_roles(["titular", "admin"]))
-):
-    resultado = service.get_titular_pendientes(db, current_user.id_usuario, periodo_id)
-    if "error" in resultado:
-        raise HTTPException(resultado["codigo"], resultado["error"])
-    return resultado
-
 @router.get("/sello")
 def obtener_sello(
     db: Session = Depends(get_db),
@@ -198,7 +179,7 @@ def listar_estudiantes_para_rectoria(
     documento: Optional[str] = Query(None),
     grupo: Optional[str] = Query(None),
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_roles(["admin", "rectoria"])),
+    current_user: Usuario = Depends(require_roles(["admin", "secretaria", "rectoria"])),
 ):
     periodo_id_valido = _validar_acceso_periodo(periodo_id, current_user, db)
     return service.listar_estudiantes_para_rectoria(db, periodo_id_valido, grado, semaforo, nombre, documento, grupo)
@@ -209,7 +190,7 @@ def listar_docentes_para_rectoria_endpoint(
     nombre: Optional[str] = Query(None),
     documento: Optional[str] = Query(None),
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_roles(["admin", "rectoria"])),
+    current_user: Usuario = Depends(require_roles(["admin", "secretaria", "rectoria"])),
 ):
     periodo_id_valido = _validar_acceso_periodo(periodo_id, current_user, db)
     return service.listar_docentes_para_rectoria(
@@ -221,7 +202,7 @@ def firmar_rectoria_docente_endpoint(
     docente_id: int,
     periodo_id: Optional[int] = Query(None),
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_roles(["admin", "rectoria"])),
+    current_user: Usuario = Depends(require_roles(["admin", "secretaria", "rectoria"])),
 ):
     resultado = service.firmar_rectoria_docente(
         db, docente_id, current_user.nombre, current_user.id_usuario, periodo_id
@@ -235,7 +216,7 @@ def descargar_pdf_estudiante_endpoint(
     estudiante_id: int,
     periodo_id: Optional[int] = Query(None),
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_roles(["admin", "rectoria"])),
+    current_user: Usuario = Depends(require_roles(["admin", "secretaria", "rectoria"])),
 ):
     periodo_id_valido = _validar_acceso_periodo(periodo_id, current_user, db)
     try:
@@ -255,7 +236,7 @@ def descargar_pdf_docente_endpoint(
     docente_id: int,
     periodo_id: Optional[int] = Query(None),
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_roles(["admin", "rectoria"])),
+    current_user: Usuario = Depends(require_roles(["admin", "secretaria", "rectoria"])),
 ):
     periodo_id_valido = _validar_acceso_periodo(periodo_id, current_user, db)
     try:
@@ -275,7 +256,7 @@ def descargar_pdf_estudiantes_batch_endpoint(
     grado: str = Query(...),
     grupo: str = Query(...),
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_roles(["admin", "rectoria"])),
+    current_user: Usuario = Depends(require_roles(["admin", "secretaria", "rectoria"])),
 ):
     periodo_id_valido = _validar_acceso_periodo(periodo_id, current_user, db)
     zip_bytes = service.descargar_pdf_estudiantes_batch(

@@ -4,35 +4,70 @@ from app.shared.models import PeriodoAcademico, Auditoria
 from app.modules.estudiantes.models import Estudiante, EstudianteBanda
 from app.modules.paz_y_salvo.models import FirmasPazYSalvo, TipoFirma, DetalleFirmaPazYSalvo
 from app.modules.uniformes.models import PrestamoObjeto
-from app.modules.paz_y_salvo.schemas import SemaforoEstado, DetalleFirma, EstudiantePendienteResponse
+from app.modules.paz_y_salvo.schemas import SemaforoEstado, DetalleFirma
 from app.modules.salon.models import Salon, Prueba, Pupitre, PrestamoLibro
 from app.modules.banda.models import PrestamoInstrumento
 from app.modules.tesoreria.models import Matricula, DetalleMatricula
 from app.modules.usuarios.models import Usuario, RolUsuario, Rol
 from datetime import datetime
-import hashlib, os
+from app.core.config import settings
+import hashlib, os, hmac
 
-SELLO_PATH = "app/modules/paz_y_salvo/sellos/sello.jpeg"
+FIRMA_DIR = "app/modules/paz_y_salvo/firmas"
+SELLO_PATH = f"{FIRMA_DIR}/Sello.png"
 
-CAMPOS_FIRMAS = ["banda", "tesoreria", "uniforme", "salon", "secretaria", "rectoria"]
+FIRMA_PATH_MAP = {
+    "Banda":        f"{FIRMA_DIR}/Firma_Banda.png",
+    "Coordinadora": f"{FIRMA_DIR}/Firma_Coordinadora.png",
+    "Uniforme":     f"{FIRMA_DIR}/Firma_Uniformes.png",
+    "Titular":      f"{FIRMA_DIR}/Firma_Titular.png",
+    "Secretaría":   f"{FIRMA_DIR}/Firma_Secretaría.png",
+    "Rectoría":     f"{FIRMA_DIR}/Firma_Rectoría.png",
+}
+
+_firma_hmacs: dict = {}
+
+def _compute_file_hmac(path: str) -> str:
+    with open(path, "rb") as f:
+        content = f.read()
+    return hmac.new(settings.SECRET_KEY.encode(), content, hashlib.sha256).hexdigest()
+
+def _init_firma_hmacs():
+    hmacs = {}
+    for path in FIRMA_PATH_MAP.values():
+        if os.path.exists(path):
+            hmacs[path] = _compute_file_hmac(path)
+    if os.path.exists(SELLO_PATH):
+        hmacs[SELLO_PATH] = _compute_file_hmac(SELLO_PATH)
+    return hmacs
+
+_firma_hmacs = _init_firma_hmacs()
+
+def _verify_firma_integrity(path: str) -> bool:
+    expected = _firma_hmacs.get(path)
+    if expected is None:
+        return False
+    current = _compute_file_hmac(path)
+    return current == expected
+
+CAMPOS_FIRMAS = ["banda", "coordinadora", "uniforme", "salon", "secretaria", "rectoria"]
 
 CAMPO_TIPO_MAP = {
     "banda": "Banda",
-    "tesoreria": "Tesorería",
+    "coordinadora": "Coordinadora",
     "uniforme": "Uniforme",
     "salon": "Salón",
     "secretaria": "Secretaría",
     "rectoria": "Rectoría",
-    
 }
 
 DETALLE_FIRMAS_CONFIG = [
-    {"campo": "banda",      "nombre": "Banda",      "rol": "banda"},
-    {"campo": "tesoreria",  "nombre": "Tesorería",  "rol": "tesoreria"},
-    {"campo": "uniforme",   "nombre": "Uniforme",   "rol": "uniformes"},
-    {"campo": "salon",      "nombre": "Salón",      "rol": "titular"},
-    {"campo": "secretaria", "nombre": "Secretaría", "rol": "secretaria"},
-    {"campo": "rectoria",   "nombre": "Rectoría",   "rol": "rectoria"},
+    {"campo": "rectoria",     "nombre": "Rectoría",     "rol": "rectoria"},
+    {"campo": "coordinadora", "nombre": "Coordinadora", "rol": "coordinadora"},
+    {"campo": "salon",        "nombre": "Titular",      "rol": "titular"},
+    {"campo": "banda",        "nombre": "Banda",        "rol": "banda"},
+    {"campo": "uniforme",     "nombre": "Uniforme",     "rol": "uniformes"},
+    {"campo": "secretaria",   "nombre": "Secretaría",   "rol": "secretaria"},
 ]
  
 
@@ -120,14 +155,17 @@ def get_firmas(db: Session, estudiante_id: int, periodo_id: Optional[int] = None
         FirmasPazYSalvo.id_periodo == periodo_id
     ).first()
     
-    if firmas and not firmas.detalles:
+    if firmas:
         tipos = db.query(TipoFirma).all()
-        for t in tipos:
+        tipos_existentes = {d.id_tipo_firma for d in firmas.detalles}
+        nuevos = [t for t in tipos if t.id_tipo_firma not in tipos_existentes]
+        for t in nuevos:
             db.add(DetalleFirmaPazYSalvo(id_firma=firmas.id_firma, id_tipo_firma=t.id_tipo_firma, estado=False))
-        db.commit()
-        firmas = db.query(FirmasPazYSalvo).options(
-            joinedload(FirmasPazYSalvo.detalles).joinedload(DetalleFirmaPazYSalvo.tipo_firma)
-        ).filter(FirmasPazYSalvo.id_firma == firmas.id_firma).first()
+        if nuevos:
+            db.commit()
+            firmas = db.query(FirmasPazYSalvo).options(
+                joinedload(FirmasPazYSalvo.detalles).joinedload(DetalleFirmaPazYSalvo.tipo_firma)
+            ).filter(FirmasPazYSalvo.id_firma == firmas.id_firma).first()
 
     if not firmas:
         firmas = FirmasPazYSalvo(
@@ -228,7 +266,7 @@ def firmar_rectoria(db: Session, estudiante_id: int, usuario_nombre: str, period
     firmas = get_firmas(db, estudiante_id, periodo_id)
     no_aplica = _get_no_aplica(db, estudiante_id)
 
-    firmas_previas = ["banda", "tesoreria", "uniforme", "salon", "secretaria"]
+    firmas_previas = ["banda", "coordinadora", "uniforme", "salon", "secretaria"]
     modulos_autocompletados = []
     for campo in firmas_previas:
         tipo_nombre = CAMPO_TIPO_MAP.get(campo)
@@ -275,82 +313,20 @@ def firmar_rectoria(db: Session, estudiante_id: int, usuario_nombre: str, period
         "fecha_firma": datetime.utcnow(),
     }
 
-def get_pendientes(db: Session, periodo_id: Optional[int] = None) -> List[dict]:
-    if not periodo_id:
-        periodo = _get_periodo_activo(db)
-        if not periodo:
-            return []
-        periodo_id = periodo.id_periodo
-
-    estudiantes = db.query(Estudiante).all()
-    resultado = []
-
-    for estudiante in estudiantes:
-        firmas = get_firmas(db, estudiante.id_estudiante, periodo_id)
-        no_aplica = _get_no_aplica(db, estudiante.id_estudiante)
-        firmas_dict = {c: _get_valor_auto(firmas, c, db, estudiante.id_estudiante, periodo_id) for c in CAMPOS_FIRMAS}
-        faltantes = [c for c in CAMPOS_FIRMAS if not _get_valor_auto(firmas, c, db, estudiante.id_estudiante, periodo_id) and c not in no_aplica]
-
-        if faltantes:
-            campos_aplican = [c for c in CAMPOS_FIRMAS if c not in no_aplica]
-            completadas = len(campos_aplican) - len(faltantes)
-            resultado.append(EstudiantePendienteResponse(
-                id_estudiante=estudiante.id_estudiante,
-                nombre=estudiante.nombre,
-                semaforo=_calcular_semaforo(firmas_dict, no_aplica),
-                firmas_faltantes=faltantes,
-                firmas_completadas=completadas,
-                total_firmas=len(campos_aplican),
-            ))
-
-    return resultado
-
 def obtener_sello() -> dict:
     if not os.path.exists(SELLO_PATH):
         return {"error": "Sello no encontrado"}
+    if not _verify_firma_integrity(SELLO_PATH):
+        return {"error": "Sello manipulado"}
     return {"ruta": SELLO_PATH, "hash": _hash_sello()}
 
-def get_titular_pendientes(db: Session, usuario_id: int, periodo_id: Optional[int] = None) -> dict:
-    if not periodo_id:
-        periodo = _get_periodo_activo(db)
-        if not periodo:
-            return {"error": "No hay periodo activo", "codigo": 400}
-        periodo_id = periodo.id_periodo
-    
-    salon = db.query(Salon).filter(
-        Salon.id_usuario == usuario_id,
-        Salon.id_periodo == periodo_id
-    ).first()
-    if not salon:
-        return {"error": "No tienes un salón asignado", "codigo": 404}
-    
-    estudiantes_data = []
-    for estudiante in salon.estudiantes:
-        firmas = get_firmas(db, estudiante.id_estudiante, periodo_id)
-        no_aplica = _get_no_aplica(db, estudiante.id_estudiante)
-        firmas_dict = {c: _get_valor_auto(firmas, c, db, estudiante.id_estudiante, periodo_id) for c in CAMPOS_FIRMAS}
-        salon_firmado = _get_valor_auto(firmas, "salon", db, estudiante.id_estudiante, periodo_id)
-
-        faltantes = [c for c in CAMPOS_FIRMAS if not _get_valor_auto(firmas, c, db, estudiante.id_estudiante, periodo_id) and c not in no_aplica]
-        campos_aplican = [c for c in CAMPOS_FIRMAS if c not in no_aplica]
-        estudiantes_data.append({
-            "id_estudiante": estudiante.id_estudiante,
-            "nombre": estudiante.nombre,
-            "semaforo": _calcular_semaforo(firmas_dict, no_aplica),
-            "salon_firmado": salon_firmado,
-            "firmas_completadas": len(campos_aplican) - len(faltantes),
-            "total_firmas": len(campos_aplican),
-            "firmas_faltantes": faltantes,
-        })
-    
-    return {
-        "id_salon": salon.id_salon,
-        "grado": salon.grado,
-        "grupo": salon.grupo,
-        "total_estudiantes": len(estudiantes_data),
-        "pendientes_salon": sum(1 for e in estudiantes_data if not e["salon_firmado"]),
-        "estudiantes": estudiantes_data,
-    }
+def obtener_firma(nombre_modulo: str) -> dict:
+    ruta = FIRMA_PATH_MAP.get(nombre_modulo)
+    if not ruta or not os.path.exists(ruta):
+        return {"error": f"Firma no encontrada para {nombre_modulo}"}
+    if not _verify_firma_integrity(ruta):
+        return {"error": f"Firma manipulada para {nombre_modulo}"}
+    return {"ruta": ruta}
 
 def _auto_banda(db: Session, estudiante_id: int) -> Optional[bool]:
     asociado = db.query(EstudianteBanda).filter(
@@ -370,20 +346,6 @@ def _auto_uniforme(db: Session, estudiante_id: int) -> bool:
     pendiente = db.query(PrestamoObjeto).filter(
         PrestamoObjeto.id_estudiante == estudiante_id,
         PrestamoObjeto.estado_entrega == "prestado"
-    ).first()
-    return pendiente is None
-
-def _auto_tesoreria(db: Session, estudiante_id: int, periodo_id: int) -> bool:
-    matricula = db.query(Matricula).filter(
-        Matricula.id_estudiante == estudiante_id,
-        Matricula.id_periodo == periodo_id
-    ).first()
-    if not matricula:
-        return False 
-    
-    pendiente = db.query(DetalleMatricula).filter(
-        DetalleMatricula.id_matricula == matricula.id_matricula,
-        DetalleMatricula.estado == "Pendiente"
     ).first()
     return pendiente is None
 
@@ -418,6 +380,13 @@ def _auto_secretaria(db: Session, estudiante_id: int, periodo_id: int) -> bool:
     ).first()
     return pendiente is None
 
+def _auto_coordinadora(db: Session, estudiante_id: int, periodo_id: int, firma: FirmasPazYSalvo) -> bool:
+    campos_requeridos = ["banda", "uniforme", "secretaria", "salon"]
+    for c in campos_requeridos:
+        if not _get_valor_auto(firma, c, db, estudiante_id, periodo_id):
+            return False
+    return True
+
 def _get_valor_auto(firma: FirmasPazYSalvo, campo: str, db: Session, estudiante_id: int, periodo_id: int) -> bool:
     if _get_valor_campo(firma, campo):
         return True
@@ -426,8 +395,8 @@ def _get_valor_auto(firma: FirmasPazYSalvo, campo: str, db: Session, estudiante_
         return auto if auto is not None else False
     elif campo == "uniforme":
         return _auto_uniforme(db, estudiante_id)
-    elif campo == "tesoreria":
-        return _auto_tesoreria(db, estudiante_id, periodo_id)
+    elif campo == "coordinadora":
+        return _auto_coordinadora(db, estudiante_id, periodo_id, firma)
     elif campo == "salon":
         return _auto_salon(db, estudiante_id)
     elif campo == "secretaria":
@@ -534,10 +503,11 @@ def listar_estudiantes_para_rectoria(db: Session, periodo_id: int, grado: Option
                 return e.id_estudiante not in prestamos_banda if e.id_estudiante in ids_banda else False
             if campo == "uniforme":
                 return e.id_estudiante not in prestamos_uniforme
-            if campo == "tesoreria":
-                if e.id_estudiante not in ids_matriculados:
-                    return False
-                return e.id_estudiante not in pendientes_tesoreria
+            if campo == "coordinadora":
+                for c in ["banda", "uniforme", "secretaria", "salon"]:
+                    if not valor_firma(c):
+                        return False
+                return True
             if campo == "salon":
                 return e.id_estudiante not in ids_pruebas and e.id_estudiante not in ids_pupitres and e.id_estudiante not in ids_libros
             if campo == "secretaria":
@@ -670,8 +640,7 @@ def descargar_pdf_estudiante(db: Session, estudiante_id: int, periodo_id: int) -
     salon = db.query(Salon).filter(Salon.id_salon == estudiante.id_salon).first() if estudiante.id_salon else None
     estado["grado"] = str(salon.grado) if salon else ""
     estado["grupo"] = str(salon.grupo) if salon else ""
-    sello_path = "app/modules/paz_y_salvo/sellos/sello.jpeg"
-    return generar_pdf_paz_salvo(estado, "estudiante", sello_path)
+    return generar_pdf_paz_salvo(estado, "estudiante", sello_path=SELLO_PATH, firma_map=FIRMA_PATH_MAP)
 
 
 def descargar_pdf_docente(db: Session, docente_id: int, periodo_id: int) -> bytes:
@@ -702,8 +671,7 @@ def descargar_pdf_docente(db: Session, docente_id: int, periodo_id: int) -> byte
             {"nombre": "Rectoría", "firmado": auditoria is not None, "no_aplica": False}
         ],
     }
-    sello_path = "app/modules/paz_y_salvo/sellos/sello.jpeg"
-    return generar_pdf_paz_salvo(data, "docente", sello_path)
+    return generar_pdf_paz_salvo(data, "docente", sello_path=SELLO_PATH, firma_map=FIRMA_PATH_MAP)
 
 def descargar_pdf_estudiantes_batch(db: Session, periodo_id: int, grado: str, grupo: str) -> bytes:
     import io, zipfile

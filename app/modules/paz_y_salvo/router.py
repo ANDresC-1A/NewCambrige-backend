@@ -49,64 +49,6 @@ def obtener_estado_paz_salvo(
         raise HTTPException(status_code=404, detail="Estudiante no encontrado")
     return resultado
 
-"""
-@router.get("/firmas/{estudiante_id}", response_model=FirmasResponse)
-def obtener_firmas(
-    estudiante_id: int,
-    periodo_id: Optional[int] = Query(None),
-    db: Session = Depends(get_db),
-    current_user = Depends(require_roles(["admin", "secretaria", "tesoreria"]))
-):
-    periodo_id_validado = _validar_acceso_periodo(periodo_id, current_user, db)
-    firmas = service.get_firmas(db, estudiante_id, periodo_id_validado)
-    if not firmas:
-        raise HTTPException(status_code=404, detail="No se encontraron firmas")
-    return {
-        "id_firma": firmas.id_firma,
-        "id_estudiante": firmas.id_estudiante,
-        "id_periodo": firmas.id_periodo,
-        "banda": service._get_valor_campo(firmas, "banda"),
-        "tesoreria": service._get_valor_campo(firmas, "tesoreria"),
-        "uniforme": service._get_valor_campo(firmas, "uniforme"),
-        "rectoria": service._get_valor_campo(firmas, "rectoria"),
-        "secretaria": service._get_valor_campo(firmas, "secretaria"),
-        "salon": service._get_valor_campo(firmas, "salon"),
-        "updated_at": firmas.updated_at,
-    }
-
-@router.put("/firmas/{estudiante_id}", response_model=FirmasResponse)
-def actualizar_firmas(
-    estudiante_id: int,
-    data: FirmasUpdate,
-    periodo_id: Optional[int] = Query(None),
-    db: Session = Depends(get_db),
-    current_user = Depends(require_roles(["admin", "secretaria", "tesoreria", "rectoria"]))
-):
-    
-    data_dict = data.model_dump(exclude_unset=True)
-    if data_dict.get("rectoria") is True:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="La firma de Rectoría debe hacerse desde POST /api/paz-salvo/rectoria/{estudiante_id}")
-
-    periodo_id_validado = _validar_acceso_periodo(periodo_id, current_user, db)
-    try:
-        firmas = service.update_firmas(db, estudiante_id, periodo_id_validado, data.model_dump(exclude_unset=True), current_user.id_usuario)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    if not firmas:
-        raise HTTPException(status_code=404, detail="Estudiante o periodo no encontrado")
-    return {
-        "id_firma": firmas.id_firma,
-        "id_estudiante": firmas.id_estudiante,
-        "id_periodo": firmas.id_periodo,
-        "banda": service._get_valor_campo(firmas, "banda"),
-        "tesoreria": service._get_valor_campo(firmas, "tesoreria"),
-        "uniforme": service._get_valor_campo(firmas, "uniforme"),
-        "rectoria": service._get_valor_campo(firmas, "rectoria"),
-        "secretaria": service._get_valor_campo(firmas, "secretaria"),
-        "salon": service._get_valor_campo(firmas, "salon"),
-        "updated_at": firmas.updated_at,
-    }
-"""
 @router.post("/rectoria/{estudiante_id}", response_model=RectoriaFirmaResponse, summary="Firma final de Rectoría")
 def firmar_rectoria(
     estudiante_id: int,
@@ -249,6 +191,16 @@ def descargar_pdf_docente_endpoint(
         media_type="application/pdf",
         headers={"Content-Disposition": f"attachment; filename={nombre_archivo}"},
     )
+
+@router.get("/imagen-firma/{nombre_modulo}")
+def obtener_imagen_firma(
+    nombre_modulo: str,
+    current_user: Usuario = Depends(require_roles(["admin", "secretaria", "rectoria"])),
+):
+    resultado = service.obtener_firma(nombre_modulo)
+    if "error" in resultado:
+        raise HTTPException(404, resultado["error"])
+    return FileResponse(resultado["ruta"], media_type="image/png")
 
 @router.get("/descargar-pdf/estudiantes/batch")
 def descargar_pdf_estudiantes_batch_endpoint(

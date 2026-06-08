@@ -13,6 +13,7 @@ from app.modules.banda.schemas import (
     InstrumentoDisponibleResponse, PrestamoActivoResponse, AuditoriaBandaResponse
 )
 from app.modules.auth.deps import require_roles
+from app.shared.models import Auditoria
 
 router = APIRouter()
 
@@ -156,7 +157,6 @@ def listar_prestamos(
     solo_activos: bool = Query(False), estudiante_id: Optional[int] = Query(None),
     db: Session = Depends(get_db), current_user = Depends(require_roles(["admin", "banda", "secretaria"]))
 ):
-    # ✅ El service ya devuelve la lista de diccionarios formateada correctamente
     return service.get_prestamos_all(db, skip, limit, solo_activos, estudiante_id)
 
 @router.get("/prestamos/activos", response_model=List[PrestamoActivoResponse])
@@ -242,12 +242,12 @@ def historial_instrumento(instrumento_id: int, db: Session = Depends(get_db), cu
     ]
 
 # ============ AUDITORÍA ============
+
 @router.get("/auditoria", response_model=List[AuditoriaBandaResponse])
-def obtener_auditoria(
-    db: Session = Depends(get_db),
-    current_user = Depends(require_roles(["admin"])) # Solo el admin puede ver esto
-):
-    return service.get_auditoria_all(db)
+def obtener_auditoria(db: Session = Depends(get_db), current_user = Depends(require_roles(["admin"]))):
+    return db.query(Auditoria).filter(
+        Auditoria.tabla.in_(["inventario_instrumento", "prestamo_instrumento"])
+    ).order_by(Auditoria.fecha.desc()).all()
 
 # ============ ESTADÍSTICAS ============
 @router.get("/estadisticas")

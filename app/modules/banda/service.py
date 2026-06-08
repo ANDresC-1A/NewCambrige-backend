@@ -3,32 +3,28 @@ from sqlalchemy import func
 from typing import Optional, List
 from datetime import date, datetime
 
+from app.shared.models import Auditoria
 from app.modules.banda.models import (
-    Categoria, Ubicacion, InventarioInstrumento, PrestamoInstrumento, AuditoriaBanda
+    Categoria, Ubicacion, InventarioInstrumento, PrestamoInstrumento
 )
 from app.modules.estudiantes.models import Estudiante
 
 # ============ AUDITORÍA (HELPER) ============
-def registrar_auditoria(db: Session, current_user, modulo: str, accion: str, entidad: str, v_ant: str, v_nue: str, resultado: str, desc: str):
-    id_usr = getattr(current_user, 'id_usuario', getattr(current_user, 'id', 0))
-    nom_usr = getattr(current_user, 'nombre', getattr(current_user, 'username', 'Sistema'))
+def registrar_auditoria_central(db: Session, current_user, tabla: str, id_reg: int, accion_msg: str):
+    """
+    Registra en la tabla 'auditoria' central del proyecto.
+    """
+    nom_usr = getattr(current_user, 'nombre', 'Sistema')
     
-    auditoria = AuditoriaBanda(
-        id_usuario=id_usr,
-        nombre_usuario=nom_usr,
-        modulo_origen=modulo,
-        tipo_accion=accion,
-        entidad_afectada=entidad,
-        valor_anterior=v_ant,
-        valor_nuevo=v_nue,
-        resultado=resultado,
-        descripcion=desc
+    mensaje_seguro = str(accion_msg)[:50]
+    
+    log = Auditoria(
+        tabla=tabla,
+        id_registro=id_reg,
+        accion=mensaje_seguro,
+        usuario=nom_usr
     )
-    db.add(auditoria)
-    
-def get_auditoria_all(db: Session) -> List[AuditoriaBanda]:
-    return db.query(AuditoriaBanda).order_by(AuditoriaBanda.id_auditoria.desc()).all()
-    
+    db.add(log)
     
 # ============ CATEGORÍAS ============
 def get_categorias_all(db: Session, skip: int = 0, limit: int = 100) -> List[Categoria]:
@@ -124,7 +120,7 @@ def get_instrumento_by_id(db: Session, instrumento_id: int) -> Optional[Inventar
     return db.query(InventarioInstrumento).options(
         joinedload(InventarioInstrumento.categoria),
         joinedload(InventarioInstrumento.ubicacion)
-    ).filter(InventarioInstrumento.id_instrumento == instrumento_id).first() # Corregido
+    ).filter(InventarioInstrumento.id_instrumento == instrumento_id).first() 
 
 def create_instrumento(db: Session, data: dict, current_user) -> InventarioInstrumento:
     data["cantidad_disponible"] = data["cantidad_total"]
@@ -132,37 +128,37 @@ def create_instrumento(db: Session, data: dict, current_user) -> InventarioInstr
     db.add(nuevo)
     db.flush() 
     
-    registrar_auditoria(
-        db, current_user, "Inventario", "Instrumento registrado", 
-        f"ID: {nuevo.id_instrumento} - {nuevo.nombre}", # Corregido
-        "—", str(data["cantidad_total"]), "EXITOSO", "Se registró un nuevo instrumento."
-    )
+    registrar_auditoria_central(
+        db, current_user, "inventario_instrumento", nuevo.id_instrumento,
+        f"REGISTRO: {nuevo.nombre}")
     db.commit()
     db.refresh(nuevo)
     return nuevo
+
+
+# app/modules/banda/service.py
 
 def update_instrumento(db: Session, instrumento_id: int, data: dict, current_user) -> Optional[InventarioInstrumento]:
     instrumento = get_instrumento_by_id(db, instrumento_id)
     if not instrumento:
         return None
     
-    valor_anterior = f"Total: {instrumento.cantidad_total}, Estado: {instrumento.estado}"
-    
-    if "cantidad_total" in data:
-        diferencia = data["cantidad_total"] - instrumento.cantidad_total
-        instrumento.cantidad_disponible += diferencia
-        if instrumento.cantidad_disponible < 0:
-            raise ValueError("La cantidad total no puede ser menor a los instrumentos actualmente prestados.")
-            
+    # ── LOGICA DE NEGOCIO: REPARACIÓN EXITOSA ──
+    if "estado" in data:
+        nuevo_estado = data["estado"]
+        if nuevo_estado == "Activo" and instrumento.estado == "En mantenimiento":
+            if instrumento.cantidad_disponible < instrumento.cantidad_total:
+                instrumento.cantidad_disponible += 1
+        
+        elif nuevo_estado == "En mantenimiento" and instrumento.estado == "Activo":
+            if instrumento.cantidad_disponible > 0:
+                instrumento.cantidad_disponible -= 1
+
     for key, value in data.items():
-        # ✅ CORREGIDO: Evitamos actualizar id_instrumento o el antiguo codigo
-        if value is not None and key not in ["id_instrumento", "id_inventario", "codigo"]:
+        if value is not None and key not in ["id_instrumento", "id_inventario"]:
             setattr(instrumento, key, value)
             
-    valor_nuevo = f"Total: {instrumento.cantidad_total}, Estado: {instrumento.estado}"
-    
-    # ✅ CORREGIDO: Usamos id_instrumento
-    registrar_auditoria(db, current_user, "Inventario", "Instrumento editado", f"ID: {instrumento.id_instrumento} - {instrumento.nombre}", valor_anterior, valor_nuevo, "EXITOSO", "Se editó el instrumento.")
+    registrar_auditoria_central(db, current_user, "inventario_instrumento", instrumento.id_instrumento, f"EDIT: {instrumento.nombre}")
     
     db.commit()
     db.refresh(instrumento)
@@ -180,8 +176,8 @@ def delete_instrumento(db: Session, instrumento_id: int, current_user) -> bool:
     if instrumento.cantidad_disponible < instrumento.cantidad_total:
         raise ValueError("No es posible eliminar este instrumento. Tiene asignaciones activas.")
     
-    # ✅ CORREGIDO: Usamos id_instrumento
-    registrar_auditoria(db, current_user, "Inventario", "Instrumento eliminado", f"ID: {instrumento.id_instrumento} - {instrumento.nombre}", "Activo", "Eliminado", "EXITOSO", "Se eliminó el instrumento.")
+    registrar_auditoria_central(db, current_user, "inventario_instrumento", instrumento_id,
+                                f"ELIMINACIÓN: {instrumento.nombre}")
     
     db.delete(instrumento)
     db.commit()
@@ -189,7 +185,6 @@ def delete_instrumento(db: Session, instrumento_id: int, current_user) -> bool:
 
 # ============ PRÉSTAMOS DE INSTRUMENTOS ============
 def get_prestamos_all(db: Session, skip: int = 0, limit: int = 100, solo_activos: bool = False, estudiante_id: Optional[int] = None) -> List[dict]:
-    # ✅ Hacemos el join con Estudiante y Salon para traer Grado/Grupo
     query = db.query(PrestamoInstrumento).options(
         joinedload(PrestamoInstrumento.instrumento),
         joinedload(PrestamoInstrumento.estudiante).joinedload(Estudiante.salon) 
@@ -200,7 +195,6 @@ def get_prestamos_all(db: Session, skip: int = 0, limit: int = 100, solo_activos
     
     prestamos = query.order_by(PrestamoInstrumento.fecha_prestamo.desc()).offset(skip).limit(limit).all()
     
-    # ✅ Mapeamos manualmente para que el Front reciba los nombres exactos que espera
     resultado = []
     for p in prestamos:
         resultado.append({
@@ -265,7 +259,9 @@ def create_prestamo(db: Session, data: dict, current_user) -> Optional[PrestamoI
     instrumento.cantidad_disponible -= 1
     
     db.add(prestamo)
-    registrar_auditoria(db, current_user, "Asignaciones", "Asignación creada", f"Inst ID: {instrumento.id_instrumento}, Est: {estudiante.nombre}", "—", "Prestado", "EXITOSO", "Se asignó un instrumento.")
+    db.flush()
+    registrar_auditoria_central(db, current_user, "prestamo_instrumento", prestamo.id_prestamo,
+                                f"ASIGNACIÓN: {instrumento.nombre}")
     db.commit()
     db.refresh(prestamo)
     return prestamo
@@ -275,7 +271,6 @@ def devolver_instrumento(db: Session, prestamo_id: int, data: dict, current_user
     if not prestamo:
         return None
     
-    # Si ya está devuelto, simplemente lo devolvemos sin error para sincronizar el front
     if prestamo.estado_entrega == "devuelto":
         return prestamo
         
@@ -285,10 +280,11 @@ def devolver_instrumento(db: Session, prestamo_id: int, data: dict, current_user
     if estado_devolucion == "Malo" and not observaciones:
         raise ValueError("Debe describir el daño del instrumento en las observaciones.")
     
+    estado_recibido = str(data.get("estado_al_devolver", "Bueno")).strip().capitalize()
+
     prestamo.estado_entrega = "devuelto"
-    prestamo.estado_al_devolver = estado_devolucion
-    prestamo.observacion = observaciones if observaciones else prestamo.observacion
-    # ✅ Usamos datetime.now() para precisión de hora en auditoría
+    prestamo.estado_al_devolver = data.get("estado_al_devolver")
+    prestamo.observacion = data.get("observaciones") or prestamo.observacion
     prestamo.fecha_devolucion = datetime.now() 
     
     instrumento = get_instrumento_by_id(db, prestamo.id_instrumento)
@@ -296,13 +292,11 @@ def devolver_instrumento(db: Session, prestamo_id: int, data: dict, current_user
         if estado_devolucion == "Bueno":
             instrumento.cantidad_disponible += 1
         else:
-            # Si el estado es malo, el instrumento queda fuera de servicio
             instrumento.estado = "En mantenimiento"
             
-    registrar_auditoria(db, current_user, "Devoluciones", "Devolución registrada", 
-                        f"Inst ID: {instrumento.id_instrumento}, Est: {prestamo.estudiante.nombre}", 
-                        "Prestado", f"Devuelto ({estado_devolucion})", "EXITOSO", 
-                        "Se registró la devolución del instrumento.")
+              
+    registrar_auditoria_central(db, current_user, "prestamo_instrumento", prestamo_id,
+                                f"DEVOLUCIÓN: {instrumento.nombre}")
     db.commit()
     db.refresh(prestamo)
     return prestamo

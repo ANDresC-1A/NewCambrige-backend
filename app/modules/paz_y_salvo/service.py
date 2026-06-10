@@ -388,7 +388,7 @@ def _auto_salon(db: Session, estudiante_id: int) -> bool:
         return False
     if db.query(PrestamoLibro).filter(
         PrestamoLibro.id_estudiante == estudiante_id,
-        PrestamoLibro.estado == "Pendiente"
+        PrestamoLibro.estado == "Prestado"
     ).first():
         return False
     return True
@@ -400,11 +400,9 @@ def _auto_secretaria(db: Session, estudiante_id: int, periodo_id: int) -> bool:
     ).first()
     if not matricula:
         return False
-    if matricula.estado != "Pagado":
-        return False
     pendiente = db.query(DetalleMatricula).filter(
         DetalleMatricula.id_matricula == matricula.id_matricula,
-        DetalleMatricula.estado == "Pendiente"
+        DetalleMatricula.estado.in_(["pendiente", "activa"])
     ).first()
     return pendiente is None
 
@@ -479,13 +477,13 @@ def listar_estudiantes_para_rectoria(db: Session, periodo_id: int, grado: Option
     ).all()
     ids_matriculados = {m.id_estudiante for m in matriculas}
     ids_matricula_map = {m.id_estudiante: m.id_matricula for m in matriculas}
-    ids_matricula_pagada = {m.id_estudiante for m in matriculas if m.estado == "Pagado"}
+    ids_matricula_pagada = {m.id_estudiante for m in matriculas}
 
     pendientes_tesoreria = set()
     if ids_matricula_map:
         detalles = db.query(DetalleMatricula).filter(
             DetalleMatricula.id_matricula.in_(ids_matricula_map.values()),
-            DetalleMatricula.estado == "Pendiente"
+            DetalleMatricula.estado.in_(["pendiente", "activa"])
         ).all()
         id_matriculas_pendientes = {d.id_matricula for d in detalles}
         for est_id, mat_id in ids_matricula_map.items():
@@ -499,7 +497,7 @@ def listar_estudiantes_para_rectoria(db: Session, periodo_id: int, grado: Option
         Pupitre.id_estudiante.in_(ids), Pupitre.estado == "Pendiente"
     ).all())
     ids_libros = set(r.id_estudiante for r in db.query(PrestamoLibro).filter(
-        PrestamoLibro.id_estudiante.in_(ids), PrestamoLibro.estado == "Pendiente"
+        PrestamoLibro.id_estudiante.in_(ids), PrestamoLibro.estado == "Prestado"
     ).all())
 
     resultado = []

@@ -20,6 +20,7 @@ class DetalleFirma(BaseModel):
     firmado: bool
     rol_responsable: str
     no_aplica: bool = False
+    id_usuario_firmante: Optional[int] = None 
 
 class EstadoPazSalvoResponse(BaseModel):
     id_estudiante: int

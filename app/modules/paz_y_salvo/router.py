@@ -111,6 +111,16 @@ def obtener_sello(
         raise HTTPException(404, resultado["error"])
     return FileResponse(resultado["ruta"], media_type="image/jpeg", headers={"X-Hash-SHA256": resultado["hash"]})
 
+@router.get("/firma/modulo/{nombre_modulo}")
+def obtener_firma_modulo(
+    nombre_modulo: str,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_roles(["admin", "secretaria", "rectoria"])),
+):
+    resultado = service._get_firma_por_modulo(nombre_modulo, db)
+    if "error" in resultado:
+        raise HTTPException(404, resultado["error"])
+    return FileResponse(resultado["ruta"], media_type="image/png")
 
 @router.get("/estudiantes-rectoria", response_model=List[EstudianteRectoriaItem])
 def listar_estudiantes_para_rectoria(

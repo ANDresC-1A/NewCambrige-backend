@@ -240,6 +240,11 @@ def registrar_prestamo(db: Session, data: dict, usuario: str):
     # STOCK
     if not objeto or objeto.cantidad_disponible < data["cantidad_prestada"]:
         return None
+    
+    # VALIDAR TALLA
+    if objeto.tipo == "vestimenta":
+        if data["talla"] != objeto.talla:
+            return "talla_invalida"
 
     # DESCONTAR
     objeto.cantidad_disponible -= data["cantidad_prestada"]

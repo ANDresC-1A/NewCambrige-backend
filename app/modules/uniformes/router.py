@@ -292,6 +292,12 @@ def registrar_prestamo(
             "El estudiante ya tiene una asignación activa"
 
         )
+    
+    if prestamo == "talla_invalida":
+        raise HTTPException(
+            status_code=400,
+            detail="La talla seleccionada no coincide con la talla registrada para la prenda"
+    )
 
     # =====================================
     # STOCK

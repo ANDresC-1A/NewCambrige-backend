@@ -25,6 +25,12 @@ def listar_salones(
     db: Session = Depends(get_db),
     current_user = Depends(require_roles(["admin", "titular", "tesoreria"]))
 ):
+    if "admin" in current_user.roles:
+        return service.get_all(db, skip, limit)
+    
+    if "titular" in current_user.roles:
+        return service.get_by_titular(db, current_user)
+    
     return service.get_all(db, skip, limit)
 
 

@@ -69,7 +69,7 @@ class AsignacionResponse(BaseModel):
     id_estudiante: int
     codigo: str
     nombre_completo: str
-    grado: Optional[int] = None
+    grado: Optional[str] = None
     grupo: Optional[str] = None
     anio: Optional[str] = None
     prenda: Optional[str] = None

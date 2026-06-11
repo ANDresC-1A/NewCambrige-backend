@@ -4,7 +4,7 @@ from typing import Optional
 import os
 
 
-def _build_pdf(data: dict, tipo: str, sello_path: Optional[str] = None) -> FPDF:
+def _build_pdf(data: dict, tipo: str, sello_path: Optional[str] = None, firma_map: Optional[dict] = None) -> FPDF:
     nombre = data.get("nombre", "")
     documento = data.get("documento", "")
     periodo = data.get("periodo_nombre", "")
@@ -91,8 +91,10 @@ def _build_pdf(data: dict, tipo: str, sello_path: Optional[str] = None) -> FPDF:
         x_centro = 148
         y_mod = 85
         pdf.line(x_centro - 40, y_mod, x_centro + 40, y_mod)
-        if detalle[0].get("firmado") and sello_path and os.path.exists(sello_path):
-            pdf.image(sello_path, x=x_centro - 15, y=y_mod - 30, w=30, h=30)
+        if detalle[0].get("firmado") and firma_map:
+            img_path = firma_map.get(detalle[0]["nombre"])
+            if img_path and os.path.exists(img_path):
+                pdf.image(img_path, x=x_centro - 15, y=y_mod - 30, w=30, h=30)
         pdf.set_xy(x_centro - 20, y_mod + 3)
         pdf.set_font("Helvetica", "B", 10)
         pdf.cell(40, 5, detalle[0]["nombre"], align="C")
@@ -118,17 +120,16 @@ def _build_pdf(data: dict, tipo: str, sello_path: Optional[str] = None) -> FPDF:
             es_dict = isinstance(m, dict)
             firmado = m.get("firmado") if es_dict else getattr(m, "firmado", False)
             nombre_modulo = m.get("nombre", "") if es_dict else getattr(m, "nombre", "")
+            no_aplica = m.get("no_aplica") if es_dict else getattr(m, "no_aplica", False)
 
             pdf.line(cx - ancho_modulo / 2, cy, cx + ancho_modulo / 2, cy)
 
-            if firmado and sello_path and os.path.exists(sello_path):
-                pdf.image(
-                    sello_path,
-                    x=cx - 12,
-                    y=cy - 26, 
-                    w=24,
-                    h=24,
-                )
+            if no_aplica and sello_path and os.path.exists(sello_path):
+                pdf.image(sello_path, x=cx - 12, y=cy - 26, w=24, h=24)
+            elif firmado and firma_map:
+                img_path = firma_map.get(nombre_modulo)
+                if img_path and os.path.exists(img_path):
+                    pdf.image(img_path, x=cx - 12, y=cy - 26, w=24, h=24)
 
             # Texto del módulo debajo de la línea
             pdf.set_xy(cx - ancho_modulo / 2, cy + 3)
@@ -145,6 +146,6 @@ def _build_pdf(data: dict, tipo: str, sello_path: Optional[str] = None) -> FPDF:
     return pdf
 
 
-def generar_pdf_paz_salvo(data: dict, tipo: str, sello_path: Optional[str] = None) -> bytes:
-    pdf = _build_pdf(data, tipo, sello_path)
+def generar_pdf_paz_salvo(data: dict, tipo: str, sello_path: Optional[str] = None, firma_map: Optional[dict] = None) -> bytes:
+    pdf = _build_pdf(data, tipo, sello_path, firma_map)
     return bytes(pdf.output())

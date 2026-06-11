@@ -9,7 +9,7 @@ class SemaforoEstado:
 
 class FirmasBase(BaseModel):
     banda: bool = False
-    tesoreria: bool = False
+    coordinadora: bool = False
     uniforme: bool = False
     salon: bool = False
     secretaria: bool = False
@@ -20,6 +20,7 @@ class DetalleFirma(BaseModel):
     firmado: bool
     rol_responsable: str
     no_aplica: bool = False
+    id_usuario_firmante: Optional[int] = None 
 
 class EstadoPazSalvoResponse(BaseModel):
     id_estudiante: int
@@ -41,14 +42,6 @@ class RectoriaFirmaResponse(BaseModel):
     nombre_estudiante: str
     paz_y_salvo_completo: bool
     fecha_firma: datetime
-
-class EstudiantePendienteResponse(BaseModel):
-    id_estudiante: int
-    nombre: str
-    semaforo: str
-    firmas_faltantes: list[str]
-    firmas_completadas: int
-    total_firmas: int
 
 class RectoriaFirmaRequest(BaseModel):
     observacion: Optional[str] = None

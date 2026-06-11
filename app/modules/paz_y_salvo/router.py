@@ -1,10 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import Optional, List
 from app.core.database import get_db
 from app.shared.models import PeriodoAcademico
 from app.modules.paz_y_salvo import service
-from app.modules.paz_y_salvo.schemas import EstadoPazSalvoResponse, RectoriaFirmaRequest, RectoriaFirmaResponse, EstudiantePendienteResponse, EstudianteRectoriaItem, DocenteRectoriaItem, DocenteRectoriaFirmaResponse
+from app.modules.paz_y_salvo.schemas import EstadoPazSalvoResponse, RectoriaFirmaRequest, RectoriaFirmaResponse, EstudianteRectoriaItem, DocenteRectoriaItem, DocenteRectoriaFirmaResponse
 from app.modules.auth.deps import require_roles
 from app.modules.usuarios.models import Usuario, RolUsuario, Rol
 from fastapi.responses import FileResponse, StreamingResponse
@@ -49,71 +49,13 @@ def obtener_estado_paz_salvo(
         raise HTTPException(status_code=404, detail="Estudiante no encontrado")
     return resultado
 
-"""
-@router.get("/firmas/{estudiante_id}", response_model=FirmasResponse)
-def obtener_firmas(
-    estudiante_id: int,
-    periodo_id: Optional[int] = Query(None),
-    db: Session = Depends(get_db),
-    current_user = Depends(require_roles(["admin", "secretaria", "tesoreria"]))
-):
-    periodo_id_validado = _validar_acceso_periodo(periodo_id, current_user, db)
-    firmas = service.get_firmas(db, estudiante_id, periodo_id_validado)
-    if not firmas:
-        raise HTTPException(status_code=404, detail="No se encontraron firmas")
-    return {
-        "id_firma": firmas.id_firma,
-        "id_estudiante": firmas.id_estudiante,
-        "id_periodo": firmas.id_periodo,
-        "banda": service._get_valor_campo(firmas, "banda"),
-        "tesoreria": service._get_valor_campo(firmas, "tesoreria"),
-        "uniforme": service._get_valor_campo(firmas, "uniforme"),
-        "rectoria": service._get_valor_campo(firmas, "rectoria"),
-        "secretaria": service._get_valor_campo(firmas, "secretaria"),
-        "salon": service._get_valor_campo(firmas, "salon"),
-        "updated_at": firmas.updated_at,
-    }
-
-@router.put("/firmas/{estudiante_id}", response_model=FirmasResponse)
-def actualizar_firmas(
-    estudiante_id: int,
-    data: FirmasUpdate,
-    periodo_id: Optional[int] = Query(None),
-    db: Session = Depends(get_db),
-    current_user = Depends(require_roles(["admin", "secretaria", "tesoreria", "rectoria"]))
-):
-    
-    data_dict = data.model_dump(exclude_unset=True)
-    if data_dict.get("rectoria") is True:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="La firma de Rectoría debe hacerse desde POST /api/paz-salvo/rectoria/{estudiante_id}")
-
-    periodo_id_validado = _validar_acceso_periodo(periodo_id, current_user, db)
-    try:
-        firmas = service.update_firmas(db, estudiante_id, periodo_id_validado, data.model_dump(exclude_unset=True), current_user.id_usuario)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    if not firmas:
-        raise HTTPException(status_code=404, detail="Estudiante o periodo no encontrado")
-    return {
-        "id_firma": firmas.id_firma,
-        "id_estudiante": firmas.id_estudiante,
-        "id_periodo": firmas.id_periodo,
-        "banda": service._get_valor_campo(firmas, "banda"),
-        "tesoreria": service._get_valor_campo(firmas, "tesoreria"),
-        "uniforme": service._get_valor_campo(firmas, "uniforme"),
-        "rectoria": service._get_valor_campo(firmas, "rectoria"),
-        "secretaria": service._get_valor_campo(firmas, "secretaria"),
-        "salon": service._get_valor_campo(firmas, "salon"),
-        "updated_at": firmas.updated_at,
-    }
-"""
 @router.post("/rectoria/{estudiante_id}", response_model=RectoriaFirmaResponse, summary="Firma final de Rectoría")
 def firmar_rectoria(
     estudiante_id: int,
     periodo_id: Optional[int] = Query(None),
     body: Optional[RectoriaFirmaRequest] = None,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_roles(["admin", "rectoria"])),
+    current_user: Usuario = Depends(require_roles(["admin", "secretaria", "rectoria"])),
 ):
     periodo_id_validado = _validar_acceso_periodo(periodo_id, current_user, db)
     resultado = service.firmar_rectoria(
@@ -159,25 +101,6 @@ def listar_periodos(
         for p in periodos
     ]
 
-@router.get("/pendientes", response_model=List[EstudiantePendienteResponse], summary="Estudiantes con paz y salvo pendiente")
-def listar_pendientes(
-    periodo_id: Optional[int] = Query(None),
-    db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_roles(["admin", "secretaria", "rectoria"])),
-):
-    return service.get_pendientes(db, periodo_id)
-
-@router.get("/titular/pendientes")
-def titular_pendientes(
-    periodo_id: Optional[int] = Query(None),
-    db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_roles(["titular", "admin"]))
-):
-    resultado = service.get_titular_pendientes(db, current_user.id_usuario, periodo_id)
-    if "error" in resultado:
-        raise HTTPException(resultado["codigo"], resultado["error"])
-    return resultado
-
 @router.get("/sello")
 def obtener_sello(
     db: Session = Depends(get_db),
@@ -188,6 +111,16 @@ def obtener_sello(
         raise HTTPException(404, resultado["error"])
     return FileResponse(resultado["ruta"], media_type="image/jpeg", headers={"X-Hash-SHA256": resultado["hash"]})
 
+@router.get("/firma/modulo/{nombre_modulo}")
+def obtener_firma_modulo(
+    nombre_modulo: str,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_roles(["admin", "secretaria", "rectoria"])),
+):
+    resultado = service._get_firma_por_modulo(nombre_modulo, db)
+    if "error" in resultado:
+        raise HTTPException(404, resultado["error"])
+    return FileResponse(resultado["ruta"], media_type="image/png")
 
 @router.get("/estudiantes-rectoria", response_model=List[EstudianteRectoriaItem])
 def listar_estudiantes_para_rectoria(
@@ -198,7 +131,7 @@ def listar_estudiantes_para_rectoria(
     documento: Optional[str] = Query(None),
     grupo: Optional[str] = Query(None),
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_roles(["admin", "rectoria"])),
+    current_user: Usuario = Depends(require_roles(["admin", "secretaria", "rectoria"])),
 ):
     periodo_id_valido = _validar_acceso_periodo(periodo_id, current_user, db)
     return service.listar_estudiantes_para_rectoria(db, periodo_id_valido, grado, semaforo, nombre, documento, grupo)
@@ -209,7 +142,7 @@ def listar_docentes_para_rectoria_endpoint(
     nombre: Optional[str] = Query(None),
     documento: Optional[str] = Query(None),
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_roles(["admin", "rectoria"])),
+    current_user: Usuario = Depends(require_roles(["admin", "secretaria", "rectoria"])),
 ):
     periodo_id_valido = _validar_acceso_periodo(periodo_id, current_user, db)
     return service.listar_docentes_para_rectoria(
@@ -221,7 +154,7 @@ def firmar_rectoria_docente_endpoint(
     docente_id: int,
     periodo_id: Optional[int] = Query(None),
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_roles(["admin", "rectoria"])),
+    current_user: Usuario = Depends(require_roles(["admin", "secretaria", "rectoria"])),
 ):
     resultado = service.firmar_rectoria_docente(
         db, docente_id, current_user.nombre, current_user.id_usuario, periodo_id
@@ -235,7 +168,7 @@ def descargar_pdf_estudiante_endpoint(
     estudiante_id: int,
     periodo_id: Optional[int] = Query(None),
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_roles(["admin", "rectoria"])),
+    current_user: Usuario = Depends(require_roles(["admin", "secretaria", "rectoria"])),
 ):
     periodo_id_valido = _validar_acceso_periodo(periodo_id, current_user, db)
     try:
@@ -255,7 +188,7 @@ def descargar_pdf_docente_endpoint(
     docente_id: int,
     periodo_id: Optional[int] = Query(None),
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_roles(["admin", "rectoria"])),
+    current_user: Usuario = Depends(require_roles(["admin", "secretaria", "rectoria"])),
 ):
     periodo_id_valido = _validar_acceso_periodo(periodo_id, current_user, db)
     try:
@@ -269,13 +202,23 @@ def descargar_pdf_docente_endpoint(
         headers={"Content-Disposition": f"attachment; filename={nombre_archivo}"},
     )
 
+@router.get("/imagen-firma/{nombre_modulo}")
+def obtener_imagen_firma(
+    nombre_modulo: str,
+    current_user: Usuario = Depends(require_roles(["admin", "secretaria", "rectoria"])),
+):
+    resultado = service.obtener_firma(nombre_modulo)
+    if "error" in resultado:
+        raise HTTPException(404, resultado["error"])
+    return FileResponse(resultado["ruta"], media_type="image/png")
+
 @router.get("/descargar-pdf/estudiantes/batch")
 def descargar_pdf_estudiantes_batch_endpoint(
     periodo_id: int = Query(...),
     grado: str = Query(...),
     grupo: str = Query(...),
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_roles(["admin", "rectoria"])),
+    current_user: Usuario = Depends(require_roles(["admin", "secretaria", "rectoria"])),
 ):
     periodo_id_valido = _validar_acceso_periodo(periodo_id, current_user, db)
     zip_bytes = service.descargar_pdf_estudiantes_batch(

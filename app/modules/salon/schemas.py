@@ -49,7 +49,7 @@ class PruebaCreate(BaseModel):
     id_estudiante: int
     id_tipo_prueba: int
     estado: Optional[str] = "Pendiente"
-
+    fecha_pago: Optional[date] = None
 
 # ======================
 # 🪑 PUPITRES

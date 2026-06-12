@@ -96,7 +96,7 @@ def listar_pruebas(
     return service.get_all_pruebas(db)
 
 
-@router.post("/pruebas", response_model=PruebaResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/pruebas", response_model=dict, status_code=status.HTTP_201_CREATED)
 def crear_prueba(
     data: PruebaCreate,
     db: Session = Depends(get_db),
@@ -111,10 +111,18 @@ def actualizar_estado_prueba(
     db: Session = Depends(get_db),
     current_user = Depends(require_roles(["admin", "titular"]))
 ):
-    prueba = service.update_estado_prueba(db, prueba_id, estado, current_user.nombre)
+    prueba = service.update_estado_prueba(db, prueba_id, estado)
     if not prueba:
         raise HTTPException(status_code=404, detail="Prueba no encontrada")
-    return prueba
+    return {
+        "id_prueba": prueba.id_prueba,
+        "estado": prueba.estado,
+        "fecha_pago": (
+            prueba.fecha_pago.strftime("%d/%m/%Y")
+            if prueba.estado == "visto" and prueba.fecha_pago
+            else None
+        ),
+    }
 
 
 # ======================
@@ -127,6 +135,14 @@ def listar_pupitres(
 ):
     return service.get_all_pupitres(db)
 
+@router.post("/pupitres", response_model=PupitreResponse, status_code=status.HTTP_201_CREATED)
+def crear_pupitre(
+    data: PupitreUpdate,
+    id_estudiante: int,
+    db: Session = Depends(get_db),
+    current_user = Depends(require_roles(["admin", "titular"]))
+):
+    return service.create_pupitre(db, id_estudiante, data.estado, data.fecha_pago)
 
 @router.put("/pupitres/{pupitre_id}", response_model=PupitreResponse)
 def actualizar_pupitre(

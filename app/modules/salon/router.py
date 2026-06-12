@@ -25,10 +25,10 @@ def listar_salones(
     db: Session = Depends(get_db),
     current_user = Depends(require_roles(["admin", "titular"]))
 ):
-    if "admin" in current_user.roles:
+    if "admin" in current_user.rol_nombres:
         return service.get_all(db, skip, limit)
     
-    if "titular" in current_user.roles:
+    if "titular" in current_user.rol_nombres:
         return service.get_by_titular(db, current_user)
     
     return service.get_all(db, skip, limit)
@@ -93,7 +93,7 @@ def listar_pruebas(
     db: Session = Depends(get_db),
     current_user = Depends(require_roles(["admin", "titular"]))
 ):
-    return service.get_all_pruebas(db)
+    return service.get_all_pruebas(db, current_user)
 
 
 @router.post("/pruebas", response_model=dict, status_code=status.HTTP_201_CREATED)
@@ -133,7 +133,7 @@ def listar_pupitres(
     db: Session = Depends(get_db),
     current_user = Depends(require_roles(["admin", "titular"]))
 ):
-    return service.get_all_pupitres(db)
+    return service.get_all_pupitres(db, current_user)
 
 @router.post("/pupitres", response_model=PupitreResponse, status_code=status.HTTP_201_CREATED)
 def crear_pupitre(
@@ -164,7 +164,7 @@ def listar_libros(
     db: Session = Depends(get_db),
     current_user = Depends(require_roles(["admin", "titular"]))
 ):
-    return service.get_all_libros(db)
+    return service.get_all_libros(db, current_user)
 
 
 @router.post("/libros", response_model=LibroResponse, status_code=status.HTTP_201_CREATED)
@@ -203,7 +203,7 @@ def listar_prestamos(
     db: Session = Depends(get_db),
     current_user = Depends(require_roles(["admin", "titular"]))
 ):
-    return service.get_all_prestamos(db)
+    return service.get_all_prestamos(db, current_user)
 
 
 @router.post("/prestamos", response_model=PrestamoResponse, status_code=status.HTTP_201_CREATED)

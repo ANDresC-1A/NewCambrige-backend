@@ -62,21 +62,28 @@ def delete(db: Session, salon_id: int) -> bool:
 # ======================
 # 🧪 PRUEBAS
 # ======================
-def get_all_pruebas(db: Session) -> list:
-    estudiantes = (
+def get_all_pruebas(db: Session, current_user) -> list:
+
+    query = (
         db.query(Estudiante)
         .options(joinedload(Estudiante.salon))
-        .all()
     )
-    
+
+    if "titular" in current_user.rol_nombres:
+        query = query.join(Salon).filter(
+            Salon.id_usuario == current_user.id_usuario
+        )
+
+    estudiantes = query.all()
+
     tipos_prueba = db.query(TipoPrueba).all()
-    
+
     resultado = []
 
     for e in estudiantes:
         salon = e.salon
+
         for tipo in tipos_prueba:
-            # Buscar si ya tiene prueba registrada para este tipo
             prueba = db.query(Prueba).filter(
                 Prueba.id_estudiante == e.id_estudiante,
                 Prueba.id_tipo_prueba == tipo.id_tipo_prueba
@@ -149,15 +156,21 @@ def update_estado_prueba(
 # ======================
 # 🪑 PUPITRES
 # ======================
-def get_all_pupitres(db: Session) -> list:
-    from sqlalchemy import outerjoin
+def get_all_pupitres(db: Session, current_user) -> list:
 
-    resultado_query = (
+    query = (
         db.query(Estudiante, Pupitre)
         .outerjoin(Pupitre, Pupitre.id_estudiante == Estudiante.id_estudiante)
+        .join(Salon, Estudiante.id_salon == Salon.id_salon)
         .options(joinedload(Estudiante.salon))
-        .all()
     )
+
+    if "titular" in current_user.rol_nombres:
+        query = query.filter(
+            Salon.id_usuario == current_user.id_usuario
+        )
+
+    resultado_query = query.all()
 
     resultado = []
 
@@ -212,8 +225,20 @@ def create_pupitre(db: Session, id_estudiante: int, estado: str, fecha_pago=None
 # ======================
 # 📚 BIBLIOTECA
 # ======================
-def get_all_libros(db: Session):
-    libros = db.query(InventarioLibro).all()
+def get_all_libros(db: Session, current_user):
+
+    query = db.query(InventarioLibro)
+
+    if "titular" in current_user.rol_nombres:
+        query = query.filter(
+            InventarioLibro.id_salon.in_(
+                db.query(Salon.id_salon).filter(
+                    Salon.id_usuario == current_user.id_usuario
+                )
+            )
+        )
+
+    libros = query.all()
 
     return [
         {
@@ -229,19 +254,29 @@ def get_all_libros(db: Session):
     ]
 
 
-def get_all_prestamos(db: Session) -> list:
-    prestamos = (
+def get_all_prestamos(db: Session, current_user) -> list:
+
+    query = (
         db.query(PrestamoLibro)
+        .join(Estudiante)
+        .join(Salon)
         .options(
             joinedload(PrestamoLibro.estudiante).joinedload(Estudiante.salon),
             joinedload(PrestamoLibro.libro)
         )
-        .all()
     )
+
+    if "titular" in current_user.rol_nombres:
+        query = query.filter(
+            Salon.id_usuario == current_user.id_usuario
+        )
+
+    prestamos = query.all()
 
     resultado = []
 
     for p in prestamos:
+
         e = p.estudiante
         salon = e.salon if e else None
 
@@ -258,7 +293,6 @@ def get_all_prestamos(db: Session) -> list:
         })
 
     return resultado
-
 
 def create_libro(db: Session, data: dict) -> InventarioLibro:
     libro = InventarioLibro(**data)

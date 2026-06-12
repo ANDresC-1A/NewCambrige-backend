@@ -63,7 +63,8 @@ def listar_objetos(
         require_roles([
             "admin",
             "uniformes",
-            "secretaria"
+            "secretaria",
+            "titular"
         ])
     )
 ):
@@ -81,8 +82,15 @@ def listar_objetos(
 )
 def obtener_inventario(
 
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 
+    current_user = Depends(
+        require_roles([
+            "admin",
+            "uniformes",
+            "titular" 
+        ])
+    )
 ):
 
     return obtener_inventario_service(db)
@@ -100,7 +108,8 @@ def objetos_disponibles(
         require_roles([
             "admin",
             "uniformes",
-            "secretaria"
+            "secretaria",
+            "titular"
         ])
     )
 ):
@@ -122,7 +131,8 @@ def crear_objeto(
     current_user = Depends(
         require_roles([
             "admin",
-            "uniformes"
+            "uniformes",
+            "titular"
         ])
     )
 ):
@@ -149,7 +159,8 @@ def actualizar_objeto(
     current_user = Depends(
         require_roles([
             "admin",
-            "uniformes"
+            "uniformes",
+            "titular"
         ])
     )
 ):
@@ -213,7 +224,8 @@ def listar_prestamos(
         require_roles([
             "admin",
             "uniformes",
-            "secretaria"
+            "secretaria",
+            "titular"
         ])
     )
 ):
@@ -242,7 +254,8 @@ def prestamos_activos(
     current_user = Depends(
         require_roles([
             "admin",
-            "uniformes"
+            "uniformes",
+            "titular"
         ])
     )
 ):
@@ -264,7 +277,8 @@ def registrar_prestamo(
     current_user = Depends(
         require_roles([
             "admin",
-            "uniformes"
+            "uniformes",
+            "titular"
         ])
     )
 ):
@@ -330,7 +344,8 @@ def devolver_prestamo_old(
     current_user = Depends(
         require_roles([
             "admin",
-            "uniformes"
+            "uniformes",
+            "titular"
         ])
     )
 ):
@@ -372,7 +387,8 @@ def listar_asignaciones(
         require_roles([
             "admin",
             "uniformes",
-            "secretaria"
+            "secretaria",
+            "titular"
         ])
     )
 ):
@@ -431,7 +447,8 @@ def devolver_uniforme(
     current_user = Depends(
         require_roles([
             "admin",
-            "uniformes"
+            "uniformes",
+            "titular"
         ])
     )
 
@@ -482,7 +499,9 @@ def eliminar_objeto(
     current_user = Depends(
         require_roles([
             "admin",
-            "uniformes"
+            "uniformes",
+            "titular"
+            
         ])
     )
 ):
@@ -566,7 +585,9 @@ def eliminar_prestamo(
     current_user = Depends(
         require_roles([
             "admin",
-            "uniformes"
+            "uniformes",
+            "titular"
+            
         ])
     )
 ):

@@ -76,7 +76,7 @@ class AsignacionResponse(BaseModel):
     fecha_entrega: Optional[datetime] = None  # Solución al Bug: Ahora acepta datetime con hora sin romper la serialización
     estado: Optional[str] = None
     estado_original: Optional[str] = None
-    talla: Optional[str] = None  # Se añade explícitamente ya que tu servicio lo incluye en el diccionario de salida
+    talla: Optional[str] = None  
     estado_entrega: Optional[str] = None
 
     class Config:
